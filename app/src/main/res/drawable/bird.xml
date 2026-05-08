@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+    <!-- Outer glow -->
+    <circle
+        android:cx="32"
+        android:cy="32"
+        android:r="22"
+        android:fillColor="#6A0DAD" />
+
+    <!-- Core darkness -->
+    <circle
+        android:cx="32"
+        android:cy="32"
+        android:r="12"
+        android:fillColor="#0B0B10" />
+
+    <!-- Rune glow -->
+    <circle
+        android:cx="24"
+        android:cy="24"
+        android:r="4"
+        android:fillColor="#FFD700" />
+
+</vector>

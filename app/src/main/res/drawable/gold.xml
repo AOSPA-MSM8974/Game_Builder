@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- coin base -->
+    <circle
+        android:cx="24"
+        android:cy="24"
+        android:r="18"
+        android:fillColor="#FFD700" />
+
+    <!-- inner ring -->
+    <circle
+        android:cx="24"
+        android:cy="24"
+        android:r="11"
+        android:fillColor="#B8860B" />
+
+    <!-- highlight -->
+    <circle
+        android:cx="18"
+        android:cy="18"
+        android:r="4"
+        android:fillColor="#FFF3A0" />
+
+</vector>

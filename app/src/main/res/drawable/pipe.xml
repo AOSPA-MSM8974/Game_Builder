@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="400dp"
+    android:viewportWidth="80"
+    android:viewportHeight="400">
+
+    <!-- Outer stone -->
+    <rect
+        android:width="80"
+        android:height="400"
+        android:fillColor="#2F2F2F" />
+
+    <!-- Inner stone depth -->
+    <rect
+        android:x="10"
+        android:width="60"
+        android:height="400"
+        android:fillColor="#3A3A3A" />
+
+    <!-- Dark cracks -->
+    <rect
+        android:x="20"
+        android:width="40"
+        android:height="400"
+        android:fillColor="#1F1F1F"
+        android:fillAlpha="0.8" />
+
+</vector>

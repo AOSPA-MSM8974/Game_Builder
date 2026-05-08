@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="1080dp"
+    android:height="1920dp"
+    android:viewportWidth="1080"
+    android:viewportHeight="1920">
+
+    <!-- Night sky -->
+    <rect
+        android:width="1080"
+        android:height="1920"
+        android:fillColor="#0B0B10" />
+
+    <!-- Mist layer 1 -->
+    <path
+        android:fillColor="#1A1A2E"
+        android:fillAlpha="0.35"
+        android:pathData="M0,400 C200,300 400,500 600,400 C800,300 900,450 1080,380 L1080,0 L0,0 Z" />
+
+    <!-- Mist layer 2 -->
+    <path
+        android:fillColor="#2B2B40"
+        android:fillAlpha="0.25"
+        android:pathData="M0,700 C250,600 450,800 700,700 C900,600 1000,750 1080,680 L1080,0 L0,0 Z" />
+
+    <!-- Ground -->
+    <rect
+        android:top="1500"
+        android:width="1080"
+        android:height="420"
+        android:fillColor="#111111" />
+
+</vector>
