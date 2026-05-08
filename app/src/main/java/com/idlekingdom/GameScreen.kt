@@ -14,7 +14,7 @@ fun GameScreen(vm: GameViewModel) {
 
     val state by vm.state.collectAsState()
 
-    val animatedGold by animateFloatAsState(
+    val goldAnim by animateFloatAsState(
         targetValue = state.gold.toFloat(),
         label = "gold"
     )
@@ -24,33 +24,21 @@ fun GameScreen(vm: GameViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Text(
-            text = "💰 Gold: ${animatedGold.toInt()}",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Text("💰 Gold: ${goldAnim.toInt()}")
+        Text("⚡ /sec: ${state.goldPerSecond}")
+        Text("🏰 Level: ${state.level}")
 
-        Text("⚡ Gold/sec: ${state.goldPerSecond}")
         Text("👹 Enemy HP: ${state.enemyHp}")
 
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("👹")
+        Button(onClick = { vm.attackBot() }) {
+            Text("⚔️ Raid Bot City")
         }
 
-        Button(onClick = { vm.attackEnemy() }) {
-            Text("⚔️ Attack")
-        }
-
-        Button(onClick = { vm.buyUpgrade() }) {
+        Button(onClick = { vm.upgrade() }) {
             Text("⬆ Upgrade (${state.upgradeCost})")
         }
     }
