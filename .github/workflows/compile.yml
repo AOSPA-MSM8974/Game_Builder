@@ -1,4 +1,4 @@
-name: Build Kivy APK (Docker Buildozer)
+name: Build Kivy Android APK (Docker Stable)
 
 on:
   push:
@@ -12,26 +12,26 @@ jobs:
     steps:
 
     # =========================
-    # 1. Checkout repo
+    # 1. Checkout repository
     # =========================
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
 
     # =========================
-    # 2. Pull + run Buildozer Docker
+    # 2. Build APK using Docker Buildozer
     # =========================
-    - name: Build APK using Buildozer Docker
+    - name: Build APK
       run: |
         docker run --rm \
           -v $PWD:/home/user/hostcwd \
           -w /home/user/hostcwd \
           kivy/buildozer:latest \
-          buildozer -v android debug
+          bash -c "buildozer -v android debug"
 
     # =========================
-    # 3. Upload APK
+    # 3. Upload APK artifact
     # =========================
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: medieval-kingdom-apk
