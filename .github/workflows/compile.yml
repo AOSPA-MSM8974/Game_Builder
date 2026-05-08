@@ -1,4 +1,4 @@
-name: Build Kivy Android APK
+name: Build Kivy Android APK (Stable)
 
 on:
   push:
@@ -11,85 +11,87 @@ jobs:
 
     steps:
 
-      # =========================
-      # 1. Checkout code
-      # =========================
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    # =========================
+    # 1. Checkout repo
+    # =========================
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # =========================
-      # 2. Python setup
-      # =========================
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+    # =========================
+    # 2. Python setup
+    # =========================
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
-      # =========================
-      # 3. System dependencies
-      # =========================
-      - name: Install system packages
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            git zip unzip openjdk-17-jdk \
-            python3-pip build-essential \
-            libffi-dev libssl-dev \
-            autoconf automake libtool pkg-config \
-            zlib1g-dev wget
+    # =========================
+    # 3. System dependencies
+    # =========================
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          git zip unzip openjdk-17-jdk \
+          python3-pip build-essential \
+          libffi-dev libssl-dev \
+          autoconf automake libtool pkg-config \
+          zlib1g-dev wget
 
-      # =========================
-      # 4. Python dependencies
-      # =========================
-      - name: Install Buildozer + Kivy
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython kivy
+    # =========================
+    # 4. Python packages
+    # =========================
+    - name: Install Buildozer + Kivy
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython kivy==2.3.0
 
-      # =========================
-      # 5. Android SDK setup (FIX AIDL)
-      # =========================
-      - name: Install Android SDK
-        run: |
-          mkdir -p $HOME/android-sdk
-          cd $HOME/android-sdk
+    # =========================
+    # 5. Android SDK (FIX AIDL + LICENSES)
+    # =========================
+    - name: Install Android SDK
+      run: |
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        mkdir -p $ANDROID_SDK_ROOT
+        cd $ANDROID_SDK_ROOT
 
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+        unzip cmdline-tools.zip
 
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools/* cmdline-tools/latest/ || true
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/ || true
 
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
 
-          yes | sdkmanager --licenses
+        # Accept all licenses (fixes build-tools errors)
+        yes | sdkmanager --licenses || true
 
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
+        # Install stable Android 34 toolchain (Kivy-safe)
+        sdkmanager \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0"
 
-      # =========================
-      # 6. Environment variables
-      # =========================
-      - name: Set environment variables
-        run: |
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+    # =========================
+    # 6. Export environment
+    # =========================
+    - name: Set environment variables
+      run: |
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
 
-      # =========================
-      # 7. Build APK
-      # =========================
-      - name: Build APK with Buildozer
-        run: |
-          buildozer -v android debug
+    # =========================
+    # 7. Build APK
+    # =========================
+    - name: Build APK with Buildozer
+      run: |
+        buildozer -v android debug
 
-      # =========================
-      # 8. Upload APK
-      # =========================
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: medieval-kingdom-apk
-          path: bin/*.apk
+    # =========================
+    # 8. Upload APK artifact
+    # =========================
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: medieval-kingdom-apk
+        path: bin/*.apk
