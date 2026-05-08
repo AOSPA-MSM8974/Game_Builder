@@ -10,34 +10,24 @@ LOLZ_DIR="$(pwd)"
 git config --global user.name "Jprimero15"
 git config --global user.email "jprimero15@aospa.co"
 
-# Inlined function to post a message
-export BOT_MSG_URL="https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage"
-function tg_post_msg() {
-    curl -s -X POST "$BOT_MSG_URL" -d chat_id="$TG_CHATID" \
-        -d "disable_web_page_preview=true" \
-        -d "parse_mode=html" \
-        -d text="$1"
-}
+sudo pacman -Syu
 
-# Send a notificaton to TG
-tg_post_msg " <b>LOLZ KERNEL Compilation Started. </b>
-       
-<b>Some Informations about Build Types: </b>
-<b>BUILT-IN WLAN: <code>This is for Android 10,11 and 12 AOSP Based Custom ROMs, e.g. CrDroid.</code></b>
-<b>MODULE_WLAN: <code>This is for Android 10 MIUI Based ROMs and GSI. </code></b>
+sudo pacman -S --needed \
+python python-pip git base-devel \
+jdk17-openjdk unzip zip
 
-<b>For more questions just message on this group and mention Jprimero15 (DO NOT DIRECT MESSAGE HIM)</b> "
+sudo archlinux-java set java-17-openjdk
 
-git clone https://github.com/Jprimero15/lolz_kernel_redmi8 -b v29-test5 --depth=1 $LOLZ_DIR/lolz
+pip install --upgrade pip
+pip install kivy buildozer cython
 
-git clone https://Jprimero15:$GITHUB_TOKEN@github.com/Jprimero15/lolzbuilder -b master $LOLZ_DIR/lolz/builder
+sudo pacman -S --needed \
+libffi openssl sqlite zlib
 
-# for AOSP based Script
-cd $LOLZ_DIR/lolz
-bash $LOLZ_DIR/lolz/builder/current_lolzbuilder.sh clanglto
-bash $LOLZ_DIR/lolz/builder/current_lolzbuilder.sh ksu clanglto
+buildozer init
 
-# Send a notificaton to TG
-tg_post_msg "<b>LOLZ KERNEL Compilation Completed</b>"
+cp -fr build.spec buildozer.spec
+
+buildozer -v android debug
 
 # End of Script
