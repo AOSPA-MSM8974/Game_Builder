@@ -13,24 +13,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Java + Gradle
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Gradle
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk gradle
+          sudo apt install -y gradle
 
-      - name: Generate Gradle Wrapper if Missing
+      - name: Generate Modern Gradle Wrapper
         run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "Gradle wrapper missing. Generating..."
-            gradle wrapper
-          else
-            echo "Gradle wrapper already exists."
-          fi
+          gradle wrapper --gradle-version 8.2
 
-      - name: Make gradlew executable
+      - name: Fix Wrapper Permissions
         run: chmod +x gradlew
 
-      - name: Build Debug APK
+      - name: Show Gradle Version
+        run: ./gradlew --version
+
+      - name: Build APK
         run: ./gradlew assembleDebug
 
       - name: Upload APK
