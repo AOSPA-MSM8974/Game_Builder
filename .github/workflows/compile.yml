@@ -1,4 +1,4 @@
-name: Android Build (Kotlin)
+name: Android Build
 
 on:
   workflow_dispatch:
@@ -13,18 +13,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Grant execute permission
-        run: chmod +x gradlew || true
-
-      - name: Build APK
+      - name: Install Java + Gradle
         run: |
-          ./gradlew assembleDebug
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk gradle
+
+      - name: Generate Gradle Wrapper if Missing
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle wrapper missing. Generating..."
+            gradle wrapper
+          else
+            echo "Gradle wrapper already exists."
+          fi
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
