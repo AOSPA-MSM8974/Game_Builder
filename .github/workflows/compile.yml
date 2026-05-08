@@ -1,38 +1,33 @@
-name: Build Kivy Android APK (Docker Stable)
+name: Android Build (Kotlin)
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    # =========================
-    # 1. Checkout repository
-    # =========================
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    # =========================
-    # 2. Build APK using Docker Buildozer
-    # =========================
-    - name: Build APK
-      run: |
-        docker run --rm \
-          -v $PWD:/home/user/hostcwd \
-          -w /home/user/hostcwd \
-          kivy/buildozer:latest \
-          bash -c "buildozer -v android debug"
+      - name: Grant execute permission
+        run: chmod +x gradlew || true
 
-    # =========================
-    # 3. Upload APK artifact
-    # =========================
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: medieval-kingdom-apk
-        path: bin/*.apk
+      - name: Build APK
+        run: |
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: idle-kingdom-apk
+          path: app/build/outputs/apk/debug/*.apk
