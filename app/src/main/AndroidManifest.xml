@@ -5,7 +5,7 @@
         android:allowBackup="true"
         android:label="Tap Defender"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar" >
 
         <activity
             android:name=".MainActivity"
