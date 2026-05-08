@@ -1,4 +1,4 @@
-name: Build Kivy Android APK (Stable)
+name: Kivy Android Full SDK Build
 
 on:
   push:
@@ -9,18 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+
     steps:
 
     # =========================
-    # 1. Checkout repo
+    # 1. Checkout code
     # =========================
-    - name: Checkout repository
+    - name: Checkout repo
       uses: actions/checkout@v4
 
     # =========================
     # 2. Python setup
     # =========================
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: "3.10"
@@ -28,67 +31,75 @@ jobs:
     # =========================
     # 3. System dependencies
     # =========================
-    - name: Install system dependencies
+    - name: Install system packages
       run: |
         sudo apt update
         sudo apt install -y \
-          git zip unzip openjdk-17-jdk \
+          git zip unzip wget curl \
+          openjdk-17-jdk \
           python3-pip build-essential \
           libffi-dev libssl-dev \
           autoconf automake libtool pkg-config \
-          zlib1g-dev wget
+          zlib1g-dev cmake
 
     # =========================
-    # 4. Python packages
+    # 4. Python dependencies
     # =========================
-    - name: Install Buildozer + Kivy
+    - name: Install Python tools
       run: |
         pip install --upgrade pip
         pip install buildozer cython kivy==2.3.0
 
     # =========================
-    # 5. Android SDK (FIX AIDL + LICENSES)
+    # 5. Install Android SDK (FULL MANUAL)
     # =========================
     - name: Install Android SDK
       run: |
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
         mkdir -p $ANDROID_SDK_ROOT
         cd $ANDROID_SDK_ROOT
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-        unzip cmdline-tools.zip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline.zip
+        unzip cmdline.zip
 
         mkdir -p cmdline-tools/latest
         mv cmdline-tools/* cmdline-tools/latest/ || true
 
         export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
 
-        # Accept all licenses (fixes build-tools errors)
+        # Accept licenses (fixes build-tools + AIDL errors)
         yes | sdkmanager --licenses || true
 
-        # Install stable Android 34 toolchain (Kivy-safe)
+        # Install FULL toolchain required for Buildozer
         sdkmanager \
           "platform-tools" \
           "platforms;android-34" \
           "build-tools;34.0.0"
 
     # =========================
-    # 6. Export environment
+    # 6. Export environment paths
     # =========================
     - name: Set environment variables
       run: |
-        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
 
     # =========================
-    # 7. Build APK
+    # 7. Buildozer config safety
     # =========================
-    - name: Build APK with Buildozer
+    - name: Prepare Buildozer
+      run: |
+        mkdir -p ~/.buildozer
+        buildozer init || true
+
+    # =========================
+    # 8. Build APK (uses system SDK)
+    # =========================
+    - name: Build APK
       run: |
         buildozer -v android debug
 
     # =========================
-    # 8. Upload APK artifact
+    # 9. Upload APK
     # =========================
     - name: Upload APK
       uses: actions/upload-artifact@v4
