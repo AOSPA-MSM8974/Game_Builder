@@ -1,4 +1,4 @@
-name: Build Kivy APK (Stable)
+name: Build Kivy APK (Docker Buildozer)
 
 on:
   push:
@@ -10,38 +10,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
+    # =========================
+    # 1. Checkout repo
+    # =========================
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-    - name: Install system dependencies
+    # =========================
+    # 2. Pull + run Buildozer Docker
+    # =========================
+    - name: Build APK using Buildozer Docker
       run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip openjdk-17-jdk \
-          python3-pip build-essential \
-          libffi-dev libssl-dev \
-          autoconf automake libtool pkg-config \
-          zlib1g-dev
+        docker run --rm \
+          -v $PWD:/home/user/hostcwd \
+          -w /home/user/hostcwd \
+          kivy/buildozer:latest \
+          buildozer -v android debug
 
-    - name: Install Buildozer + Kivy
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython kivy==2.3.0
-
-    - name: Clean Buildozer cache (IMPORTANT)
-      run: |
-        rm -rf .buildozer || true
-
-    - name: Build APK (LET BUILDOZER HANDLE EVERYTHING)
-      run: |
-        buildozer -v android debug
-
-    - name: Upload APK
+    # =========================
+    # 3. Upload APK
+    # =========================
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: apk
+        name: medieval-kingdom-apk
         path: bin/*.apk
