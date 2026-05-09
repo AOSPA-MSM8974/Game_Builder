@@ -4,25 +4,14 @@
     android:viewportWidth="80"
     android:viewportHeight="400">
 
-    <!-- Outer stone -->
-    <rect
-        android:width="80"
-        android:height="400"
-        android:fillColor="#2F2F2F" />
+    <!-- Tower -->
+    <path
+        android:fillColor="#2F2F2F"
+        android:pathData="M0,0 H80 V400 H0 Z"/>
 
-    <!-- Inner stone depth -->
-    <rect
-        android:x="10"
-        android:width="60"
-        android:height="400"
-        android:fillColor="#3A3A3A" />
-
-    <!-- Dark cracks -->
-    <rect
-        android:x="20"
-        android:width="40"
-        android:height="400"
-        android:fillColor="#1F1F1F"
-        android:fillAlpha="0.8" />
+    <!-- Inner shading -->
+    <path
+        android:fillColor="#3A3A3A"
+        android:pathData="M10,0 H70 V400 H10 Z"/>
 
 </vector>

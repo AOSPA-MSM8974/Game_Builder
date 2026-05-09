@@ -4,25 +4,22 @@
     android:viewportWidth="64"
     android:viewportHeight="64">
 
-    <!-- Outer glow -->
-    <circle
-        android:cx="32"
-        android:cy="32"
-        android:r="22"
-        android:fillColor="#6A0DAD" />
+    <!-- Outer orb -->
+    <path
+        android:fillColor="#6A0DAD"
+        android:pathData="M32,8
+                          A24,24 0 1,1 31.9,8 Z"/>
 
-    <!-- Core darkness -->
-    <circle
-        android:cx="32"
-        android:cy="32"
-        android:r="12"
-        android:fillColor="#0B0B10" />
+    <!-- Inner core -->
+    <path
+        android:fillColor="#0B0B10"
+        android:pathData="M32,20
+                          A12,12 0 1,1 31.9,20 Z"/>
 
-    <!-- Rune glow -->
-    <circle
-        android:cx="24"
-        android:cy="24"
-        android:r="4"
-        android:fillColor="#FFD700" />
+    <!-- Gold eye -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M24,20
+                          A4,4 0 1,1 23.9,20 Z"/>
 
 </vector>

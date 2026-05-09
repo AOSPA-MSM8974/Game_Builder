@@ -4,25 +4,16 @@
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- coin base -->
-    <circle
-        android:cx="24"
-        android:cy="24"
-        android:r="18"
-        android:fillColor="#FFD700" />
+    <!-- Coin -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M24,6
+                          A18,18 0 1,1 23.9,6 Z"/>
 
-    <!-- inner ring -->
-    <circle
-        android:cx="24"
-        android:cy="24"
-        android:r="11"
-        android:fillColor="#B8860B" />
-
-    <!-- highlight -->
-    <circle
-        android:cx="18"
-        android:cy="18"
-        android:r="4"
-        android:fillColor="#FFF3A0" />
+    <!-- Inner -->
+    <path
+        android:fillColor="#B8860B"
+        android:pathData="M24,13
+                          A11,11 0 1,1 23.9,13 Z"/>
 
 </vector>
