@@ -13,6 +13,10 @@ import androidx.appcompat.app.AppCompatActivity
 import kotlin.math.*
 import kotlin.random.Random
 
+// =====================================================
+// MAIN ACTIVITY
+// =====================================================
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var gameView: GameView
@@ -62,32 +66,33 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+// =====================================================
+// CONFIG
+// =====================================================
+
 object Config {
 
-    const val GRAVITY = 1500f
-    const val FLAP_VELOCITY = -560f
-
-    // smoother movement
-    const val PIPE_SPEED = 240f
-
-    // more separated
-    const val PIPE_SPAWN_DIST = 620f
-
-    // larger opening
-    const val PIPE_GAP = 360f
-
-    const val PIPE_WIDTH = 90f
-
-    const val BIRD_RADIUS = 32f
-    const val BIRD_X_RATIO = 0.22f
-
-    const val GROUND_HEIGHT = 110f
-
     const val TARGET_FPS = 120
-    const val FRAME_TIME_MS = (1000.0 / TARGET_FPS).toLong()
+    const val FRAME_TIME = (1000L / TARGET_FPS)
 
-    const val COUNTDOWN_TIME = 3f
+    const val GRAVITY = 1480f
+    const val FLAP_FORCE = -570f
+
+    const val PIPE_SPEED = 250f
+    const val PIPE_WIDTH = 120f
+    const val PIPE_GAP = 390f
+    const val PIPE_DISTANCE = 700f
+
+    const val ROCKET_SIZE = 40f
+
+    const val GROUND_HEIGHT = 160f
+
+    const val COUNTDOWN = 3f
 }
+
+// =====================================================
+// DATA
+// =====================================================
 
 data class Pipe(
     var x: Float,
@@ -102,11 +107,17 @@ enum class GameState {
     DEAD
 }
 
-class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
+// =====================================================
+// GAME VIEW
+// =====================================================
 
-    private var gameThread: GameThread? = null
+class GameView(context: Context) :
+    SurfaceView(context),
+    SurfaceHolder.Callback {
 
-    private val game = FlappyGame()
+    private var thread: GameThread? = null
+
+    private val game = RocketGame()
 
     init {
         holder.addCallback(this)
@@ -117,8 +128,8 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
         game.init(width.toFloat(), height.toFloat())
 
-        gameThread = GameThread(holder, game)
-        gameThread?.start()
+        thread = GameThread(holder, game)
+        thread?.start()
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -134,22 +145,22 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
 
     fun pause() {
 
-        gameThread?.running = false
+        thread?.running = false
 
         try {
-            gameThread?.join()
+            thread?.join()
         } catch (_: Exception) {
         }
 
-        gameThread = null
+        thread = null
     }
 
     fun resume() {
 
-        if (gameThread == null && holder.surface.isValid) {
+        if (thread == null && holder.surface.isValid) {
 
-            gameThread = GameThread(holder, game)
-            gameThread?.start()
+            thread = GameThread(holder, game)
+            thread?.start()
         }
     }
 
@@ -171,9 +182,13 @@ class GameView(context: Context) : SurfaceView(context), SurfaceHolder.Callback 
     }
 }
 
+// =====================================================
+// GAME THREAD
+// =====================================================
+
 class GameThread(
     private val holder: SurfaceHolder,
-    private val game: FlappyGame
+    private val game: RocketGame
 ) : Thread() {
 
     @Volatile
@@ -181,17 +196,17 @@ class GameThread(
 
     override fun run() {
 
-        var lastTime = System.nanoTime()
+        var last = System.nanoTime()
 
         while (running) {
 
             val now = System.nanoTime()
 
             val dt =
-                ((now - lastTime) / 1_000_000_000f)
+                ((now - last) / 1_000_000_000f)
                     .coerceAtMost(0.033f)
 
-            lastTime = now
+            last = now
 
             game.update(dt)
 
@@ -204,9 +219,11 @@ class GameThread(
                 holder.unlockCanvasAndPost(canvas)
             }
 
-            val elapsed = (System.nanoTime() - now) / 1_000_000L
+            val elapsed =
+                (System.nanoTime() - now) / 1_000_000L
 
-            val sleep = Config.FRAME_TIME_MS - elapsed
+            val sleep =
+                Config.FRAME_TIME - elapsed
 
             if (sleep > 0) {
                 sleep(sleep)
@@ -215,46 +232,78 @@ class GameThread(
     }
 }
 
-class FlappyGame {
+// =====================================================
+// GAME
+// =====================================================
+
+class RocketGame {
 
     private var sw = 0f
     private var sh = 0f
 
     private var groundY = 0f
 
-    private var birdX = 0f
-    private var birdY = 0f
+    // rocket
 
-    private var velY = 0f
+    private var rocketX = 0f
+    private var rocketY = 0f
+
+    private var velocityY = 0f
 
     private var rotation = 0f
+
+    // state
+
+    private var state = GameState.IDLE
+
+    private var countdown = Config.COUNTDOWN
+
+    // gameplay
 
     private val pipes = mutableListOf<Pipe>()
 
     private var score = 0
     private var bestScore = 0
 
-    private var state = GameState.IDLE
+    // animation
 
-    private var countdownTimer = Config.COUNTDOWN_TIME
+    private var time = 0f
 
-    private var idleTime = 0f
+    private var bgScroll = 0f
+
+    private var flash = 0f
+
+    // paints
 
     private val skyPaint = Paint()
 
+    private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val mountainPaint = Paint()
+
+    private val hillPaint = Paint()
+
     private val pipePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val birdPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pipeDark = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val groundPaint = Paint()
+    private val grassPaint = Paint()
+
+    private val dirtPaint = Paint()
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val rocketPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val wingPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val flamePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    private val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     fun init(w: Float, h: Float) {
 
@@ -263,59 +312,73 @@ class FlappyGame {
 
         groundY = sh - Config.GROUND_HEIGHT
 
-        birdX = sw * Config.BIRD_X_RATIO
-        birdY = sh * 0.45f
+        rocketX = sw * 0.24f
+        rocketY = sh * 0.45f
+
+        // sky
 
         skyPaint.shader = LinearGradient(
             0f,
             0f,
             0f,
             sh,
-            Color.parseColor("#5dade2"),
-            Color.parseColor("#85c1e9"),
+            Color.parseColor("#5ed0ff"),
+            Color.parseColor("#b9f1ff"),
             Shader.TileMode.CLAMP
         )
 
-        pipePaint.color = Color.parseColor("#2ecc71")
+        cloudPaint.color = Color.WHITE
 
-        birdPaint.color = Color.parseColor("#f1c40f")
+        mountainPaint.color =
+            Color.parseColor("#88b8d8")
 
-        groundPaint.color = Color.parseColor("#58d68d")
+        hillPaint.color =
+            Color.parseColor("#5fbf5f")
+
+        pipePaint.color =
+            Color.parseColor("#32d74b")
+
+        pipeDark.color =
+            Color.parseColor("#1ea336")
+
+        grassPaint.color =
+            Color.parseColor("#4cff5d")
+
+        dirtPaint.color =
+            Color.parseColor("#b86f2d")
 
         textPaint.apply {
+
             color = Color.WHITE
             textSize = 90f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
 
-        shadowPaint.apply {
+        outlinePaint.apply {
+
             color = Color.BLACK
-            alpha = 100
+            style = Paint.Style.STROKE
+            strokeWidth = 10f
             textSize = 90f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
 
-        hintPaint.apply {
-            color = Color.WHITE
-            textSize = 40f
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-        }
+        rocketPaint.color = Color.WHITE
 
-        glowPaint.apply {
-            color = Color.WHITE
-            alpha = 120
-            textSize = 170f
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            maskFilter = BlurMaskFilter(
-                18f,
-                BlurMaskFilter.Blur.NORMAL
-            )
-        }
+        wingPaint.color =
+            Color.parseColor("#ff3b30")
+
+        glassPaint.color =
+            Color.parseColor("#6fd9ff")
+
+        whitePaint.color = Color.WHITE
     }
+
+    // =====================================================
+    // INPUT
+    // =====================================================
 
     fun onTap() {
 
@@ -323,16 +386,17 @@ class FlappyGame {
 
             GameState.IDLE -> {
 
-                countdownTimer = Config.COUNTDOWN_TIME
+                countdown = Config.COUNTDOWN
                 state = GameState.COUNTDOWN
             }
 
-            GameState.COUNTDOWN -> {
-            }
+            GameState.COUNTDOWN -> {}
 
             GameState.RUNNING -> {
 
-                velY = Config.FLAP_VELOCITY
+                velocityY = Config.FLAP_FORCE
+
+                flash = 0.08f
             }
 
             GameState.DEAD -> {
@@ -344,58 +408,66 @@ class FlappyGame {
 
     private fun restart() {
 
-        pipes.clear()
-
-        birdY = sh * 0.45f
-
-        velY = 0f
-
-        rotation = 0f
+        state = GameState.IDLE
 
         score = 0
 
-        countdownTimer = Config.COUNTDOWN_TIME
+        pipes.clear()
 
-        state = GameState.IDLE
+        velocityY = 0f
+
+        rocketY = sh * 0.45f
+
+        rotation = 0f
     }
+
+    // =====================================================
+    // UPDATE
+    // =====================================================
 
     fun update(dt: Float) {
 
-        idleTime += dt
+        time += dt
+
+        bgScroll += Config.PIPE_SPEED * dt
+
+        flash = (flash - dt * 2f)
+            .coerceAtLeast(0f)
 
         when (state) {
 
             GameState.IDLE -> {
 
-                birdY =
+                rocketY =
                     sh * 0.45f +
-                            sin(idleTime * 2f) * 18f
+                            sin(time * 3f) * 16f
             }
 
             GameState.COUNTDOWN -> {
 
-                birdY =
+                rocketY =
                     sh * 0.45f +
-                            sin(idleTime * 2f) * 18f
+                            sin(time * 3f) * 16f
 
-                countdownTimer -= dt
+                countdown -= dt
 
-                if (countdownTimer <= 0f) {
+                if (countdown <= 0f) {
 
                     state = GameState.RUNNING
 
-                    velY = Config.FLAP_VELOCITY
+                    velocityY = Config.FLAP_FORCE
                 }
             }
 
             GameState.RUNNING -> {
 
-                velY += Config.GRAVITY * dt
+                velocityY += Config.GRAVITY * dt
 
-                birdY += velY * dt
+                rocketY += velocityY * dt
 
-                rotation = (velY / 18f)
-                    .coerceIn(-25f, 90f)
+                rotation =
+                    (velocityY / 16f)
+                        .coerceIn(-28f, 88f)
 
                 updatePipes(dt)
 
@@ -411,14 +483,11 @@ class FlappyGame {
 
             GameState.DEAD -> {
 
-                velY += Config.GRAVITY * dt
+                velocityY += Config.GRAVITY * dt
 
-                birdY += velY * dt
+                rocketY += velocityY * dt
 
-                birdY =
-                    birdY.coerceAtMost(
-                        groundY - Config.BIRD_RADIUS
-                    )
+                rotation = 90f
             }
         }
     }
@@ -431,7 +500,7 @@ class FlappyGame {
 
             if (
                 !pipe.scored &&
-                pipe.x + Config.PIPE_WIDTH < birdX
+                pipe.x + Config.PIPE_WIDTH < rocketX
             ) {
 
                 pipe.scored = true
@@ -441,27 +510,31 @@ class FlappyGame {
         }
 
         pipes.removeAll {
-            it.x + Config.PIPE_WIDTH < 0f
+            it.x + Config.PIPE_WIDTH < -50f
         }
 
         if (
             pipes.isEmpty() ||
-            pipes.last().x < sw - Config.PIPE_SPAWN_DIST
+            pipes.last().x <
+            sw - Config.PIPE_DISTANCE
         ) {
 
-            val minGapTop = sh * 0.18f
+            val minGap =
+                sh * 0.16f
 
-            val maxGapTop =
-                groundY - Config.PIPE_GAP - sh * 0.18f
+            val maxGap =
+                groundY -
+                        Config.PIPE_GAP -
+                        sh * 0.16f
 
             val gapTop =
                 Random.nextFloat() *
-                        (maxGapTop - minGapTop) +
-                        minGapTop
+                        (maxGap - minGap) +
+                        minGap
 
             pipes.add(
                 Pipe(
-                    sw + 100f,
+                    sw + 150f,
                     gapTop
                 )
             )
@@ -470,11 +543,12 @@ class FlappyGame {
 
     private fun checkCollision(): Boolean {
 
-        val r = Config.BIRD_RADIUS * 0.68f
+        val r =
+            Config.ROCKET_SIZE * 0.58f
 
         if (
-            birdY + r >= groundY ||
-            birdY - r <= 0f
+            rocketY + r >= groundY ||
+            rocketY - r <= 0f
         ) {
             return true
         }
@@ -482,16 +556,18 @@ class FlappyGame {
         for (pipe in pipes) {
 
             val left = pipe.x
-            val right = pipe.x + Config.PIPE_WIDTH
+            val right =
+                pipe.x + Config.PIPE_WIDTH
 
             if (
-                birdX + r > left &&
-                birdX - r < right
+                rocketX + r > left &&
+                rocketX - r < right
             ) {
 
                 if (
-                    birdY - r < pipe.gapTop ||
-                    birdY + r > pipe.gapTop + Config.PIPE_GAP
+                    rocketY - r < pipe.gapTop ||
+                    rocketY + r >
+                    pipe.gapTop + Config.PIPE_GAP
                 ) {
                     return true
                 }
@@ -501,20 +577,34 @@ class FlappyGame {
         return false
     }
 
+    // =====================================================
+    // DRAW
+    // =====================================================
+
     fun draw(canvas: Canvas) {
 
-        drawBackground(canvas)
+        drawSky(canvas)
+
+        drawMountains(canvas)
+
+        drawClouds(canvas)
 
         drawPipes(canvas)
 
         drawGround(canvas)
 
-        drawBird(canvas)
+        drawRocket(canvas)
 
         drawUI(canvas)
+
+        drawBoostFlash(canvas)
     }
 
-    private fun drawBackground(canvas: Canvas) {
+    // =====================================================
+    // BACKGROUND
+    // =====================================================
+
+    private fun drawSky(canvas: Canvas) {
 
         canvas.drawRect(
             0f,
@@ -525,6 +615,164 @@ class FlappyGame {
         )
     }
 
+    private fun drawMountains(canvas: Canvas) {
+
+        val mountainWidth = 420f
+
+        var x =
+            -(bgScroll * 0.15f % mountainWidth)
+
+        while (x < sw + mountainWidth) {
+
+            val path = Path()
+
+            path.moveTo(x, groundY)
+
+            path.lineTo(
+                x + mountainWidth / 2f,
+                groundY - 260f
+            )
+
+            path.lineTo(
+                x + mountainWidth,
+                groundY
+            )
+
+            path.close()
+
+            canvas.drawPath(
+                path,
+                mountainPaint
+            )
+
+            x += mountainWidth
+        }
+    }
+
+    private fun drawClouds(canvas: Canvas) {
+
+        for (i in 0..5) {
+
+            val x =
+                ((i * 350f) -
+                        (bgScroll * 0.25f % 2000f))
+
+            val y =
+                110f +
+                        sin(time + i) * 20f
+
+            drawCloud(
+                canvas,
+                x,
+                y
+            )
+        }
+    }
+
+    private fun drawCloud(
+        canvas: Canvas,
+        x: Float,
+        y: Float
+    ) {
+
+        canvas.drawCircle(
+            x,
+            y,
+            38f,
+            cloudPaint
+        )
+
+        canvas.drawCircle(
+            x + 38f,
+            y - 10f,
+            48f,
+            cloudPaint
+        )
+
+        canvas.drawCircle(
+            x + 86f,
+            y,
+            38f,
+            cloudPaint
+        )
+
+        canvas.drawRect(
+            x,
+            y,
+            x + 86f,
+            y + 35f,
+            cloudPaint
+        )
+    }
+
+    // =====================================================
+    // PIPES
+    // =====================================================
+
+    private fun drawPipes(canvas: Canvas) {
+
+        for (pipe in pipes) {
+
+            drawPipe(
+                canvas,
+                pipe.x,
+                0f,
+                pipe.gapTop
+            )
+
+            drawPipe(
+                canvas,
+                pipe.x,
+                pipe.gapTop + Config.PIPE_GAP,
+                groundY
+            )
+        }
+    }
+
+    private fun drawPipe(
+        canvas: Canvas,
+        x: Float,
+        top: Float,
+        bottom: Float
+    ) {
+
+        canvas.drawRect(
+            x,
+            top,
+            x + Config.PIPE_WIDTH,
+            bottom,
+            pipeDark
+        )
+
+        canvas.drawRect(
+            x + 12f,
+            top,
+            x + Config.PIPE_WIDTH - 12f,
+            bottom,
+            pipePaint
+        )
+
+        canvas.drawRect(
+            x - 10f,
+            bottom - 34f,
+            x + Config.PIPE_WIDTH + 10f,
+            bottom,
+            pipeDark
+        )
+
+        canvas.drawRect(
+            x - 4f,
+            bottom - 26f,
+            x + Config.PIPE_WIDTH + 4f,
+            bottom - 6f,
+            pipePaint
+        )
+    }
+
+    // =====================================================
+    // GROUND
+    // =====================================================
+
     private fun drawGround(canvas: Canvas) {
 
         canvas.drawRect(
@@ -532,187 +780,299 @@ class FlappyGame {
             groundY,
             sw,
             sh,
-            groundPaint
+            dirtPaint
         )
-    }
 
-    private fun drawPipes(canvas: Canvas) {
+        canvas.drawRect(
+            0f,
+            groundY,
+            sw,
+            groundY + 28f,
+            grassPaint
+        )
 
-        for (pipe in pipes) {
+        var x =
+            -(bgScroll % 64f)
 
-            canvas.drawRoundRect(
-                RectF(
-                    pipe.x,
-                    0f,
-                    pipe.x + Config.PIPE_WIDTH,
-                    pipe.gapTop
-                ),
-                12f,
-                12f,
-                pipePaint
+        while (x < sw) {
+
+            canvas.drawRect(
+                x,
+                groundY + 28f,
+                x + 32f,
+                groundY + 72f,
+                Paint().apply {
+                    color =
+                        Color.parseColor("#d38b42")
+                }
             )
 
-            canvas.drawRoundRect(
-                RectF(
-                    pipe.x,
-                    pipe.gapTop + Config.PIPE_GAP,
-                    pipe.x + Config.PIPE_WIDTH,
-                    groundY
-                ),
-                12f,
-                12f,
-                pipePaint
-            )
+            x += 64f
         }
     }
 
-    private fun drawBird(canvas: Canvas) {
+    // =====================================================
+    // ROCKET
+    // =====================================================
+
+    private fun drawRocket(canvas: Canvas) {
+
+        val flame =
+            sin(time * 32f) * 14f
 
         canvas.save()
 
-        canvas.translate(birdX, birdY)
+        canvas.translate(
+            rocketX,
+            rocketY
+        )
 
         canvas.rotate(rotation)
 
-        canvas.drawCircle(
-            0f,
-            0f,
-            Config.BIRD_RADIUS,
-            birdPaint
+        // flame outer
+
+        flamePaint.color =
+            Color.parseColor("#ff9500")
+
+        canvas.drawOval(
+            RectF(
+                -88f - flame,
+                -14f,
+                -34f,
+                14f
+            ),
+            flamePaint
         )
 
-        val eyePaint = Paint().apply {
-            color = Color.WHITE
-            isAntiAlias = true
-        }
+        // flame inner
+
+        flamePaint.color =
+            Color.parseColor("#fff700")
+
+        canvas.drawOval(
+            RectF(
+                -74f - flame,
+                -8f,
+                -38f,
+                8f
+            ),
+            flamePaint
+        )
+
+        // body
+
+        canvas.drawRoundRect(
+            RectF(
+                -38f,
+                -20f,
+                40f,
+                20f
+            ),
+            20f,
+            20f,
+            rocketPaint
+        )
+
+        // nose
+
+        val nose = Path()
+
+        nose.moveTo(40f, -20f)
+        nose.lineTo(74f, 0f)
+        nose.lineTo(40f, 20f)
+        nose.close()
+
+        canvas.drawPath(
+            nose,
+            wingPaint
+        )
+
+        // top wing
+
+        val topWing = Path()
+
+        topWing.moveTo(-10f, -18f)
+        topWing.lineTo(-38f, -42f)
+        topWing.lineTo(6f, -18f)
+
+        canvas.drawPath(
+            topWing,
+            wingPaint
+        )
+
+        // bottom wing
+
+        val bottomWing = Path()
+
+        bottomWing.moveTo(-10f, 18f)
+        bottomWing.lineTo(-38f, 42f)
+        bottomWing.lineTo(6f, 18f)
+
+        canvas.drawPath(
+            bottomWing,
+            wingPaint
+        )
+
+        // window
 
         canvas.drawCircle(
             12f,
-            -8f,
-            8f,
-            eyePaint
+            0f,
+            12f,
+            glassPaint
         )
 
-        val pupilPaint = Paint().apply {
-            color = Color.BLACK
-            isAntiAlias = true
-        }
-
         canvas.drawCircle(
-            14f,
-            -8f,
+            8f,
+            -4f,
             4f,
-            pupilPaint
+            whitePaint
         )
 
         canvas.restore()
     }
 
+    // =====================================================
+    // UI
+    // =====================================================
+
     private fun drawUI(canvas: Canvas) {
 
-        if (state == GameState.RUNNING) {
+        if (
+            state == GameState.RUNNING ||
+            state == GameState.COUNTDOWN
+        ) {
 
-            canvas.drawText(
-                score.toString(),
-                sw / 2f + 4f,
-                124f,
-                shadowPaint
-            )
-
-            canvas.drawText(
+            drawOutlinedText(
+                canvas,
                 score.toString(),
                 sw / 2f,
                 120f,
-                textPaint
+                96f
             )
         }
 
         if (state == GameState.IDLE) {
 
-            textPaint.textSize = 82f
-
-            canvas.drawText(
-                "FLAPPY BIRD",
+            drawOutlinedText(
+                canvas,
+                "ROCKET DASH",
                 sw / 2f,
                 sh * 0.24f,
-                textPaint
+                84f
             )
 
-            hintPaint.textSize = 42f
-
-            canvas.drawText(
+            drawOutlinedText(
+                canvas,
                 "TAP TO START",
                 sw / 2f,
-                sh * 0.80f,
-                hintPaint
+                sh * 0.82f,
+                42f
             )
         }
 
         if (state == GameState.COUNTDOWN) {
 
-            val num = ceil(countdownTimer)
-                .toInt()
-                .coerceAtLeast(1)
+            val num =
+                ceil(countdown)
+                    .toInt()
+                    .coerceAtLeast(1)
 
-            canvas.drawText(
+            drawOutlinedText(
+                canvas,
                 num.toString(),
                 sw / 2f,
-                sh * 0.45f,
-                glowPaint
-            )
-
-            textPaint.textSize = 170f
-
-            canvas.drawText(
-                num.toString(),
-                sw / 2f,
-                sh * 0.45f,
-                textPaint
-            )
-
-            hintPaint.textSize = 44f
-
-            canvas.drawText(
-                "GET READY",
-                sw / 2f,
-                sh * 0.60f,
-                hintPaint
+                sh * 0.46f,
+                180f
             )
         }
 
         if (state == GameState.DEAD) {
 
-            textPaint.textSize = 70f
-
-            canvas.drawText(
+            drawOutlinedText(
+                canvas,
                 "GAME OVER",
                 sw / 2f,
-                sh * 0.35f,
-                textPaint
+                sh * 0.34f,
+                74f
             )
 
-            hintPaint.textSize = 42f
-
-            canvas.drawText(
-                "Score: $score",
+            drawOutlinedText(
+                canvas,
+                "SCORE: $score",
                 sw / 2f,
                 sh * 0.48f,
-                hintPaint
+                44f
             )
 
-            canvas.drawText(
-                "Best: $bestScore",
+            drawOutlinedText(
+                canvas,
+                "BEST: $bestScore",
                 sw / 2f,
                 sh * 0.56f,
-                hintPaint
+                44f
             )
 
-            canvas.drawText(
+            drawOutlinedText(
+                canvas,
                 "TAP TO RESTART",
                 sw / 2f,
-                sh * 0.75f,
-                hintPaint
+                sh * 0.76f,
+                42f
             )
         }
+    }
+
+    private fun drawOutlinedText(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        y: Float,
+        size: Float
+    ) {
+
+        textPaint.textSize = size
+        outlinePaint.textSize = size
+
+        canvas.drawText(
+            text,
+            x,
+            y,
+            outlinePaint
+        )
+
+        canvas.drawText(
+            text,
+            x,
+            y,
+            textPaint
+        )
+    }
+
+    // =====================================================
+    // BOOST FLASH
+    // =====================================================
+
+    private fun drawBoostFlash(canvas: Canvas) {
+
+        if (flash <= 0f) return
+
+        val paint = Paint()
+
+        paint.color =
+            Color.argb(
+                (flash * 90f).toInt(),
+                255,
+                255,
+                255
+            )
+
+        canvas.drawRect(
+            0f,
+            0f,
+            sw,
+            sh,
+            paint
+        )
     }
 }
