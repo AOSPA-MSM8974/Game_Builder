@@ -12,6 +12,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.idlekingdom.engine.FlappyEngine
 import com.idlekingdom.model.*
+import com.idlekingdom.R
 import kotlinx.coroutines.delay
 
 @Composable
