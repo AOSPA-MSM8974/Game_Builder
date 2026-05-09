@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.new.flappybird"
+    namespace = "com.maxi.flappybird"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.new.flappybird"
+        applicationId = "com.maxi.flappybird"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
