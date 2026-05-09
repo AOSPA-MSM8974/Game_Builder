@@ -18,11 +18,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.withFrameNanos
 import com.idlekingdom.R
 import com.idlekingdom.engine.FlappyEngine
 import com.idlekingdom.model.FlappyState
 import com.idlekingdom.model.KingdomState
-import kotlinx.coroutines.delay
 
 @Composable
 fun GameScreen(
@@ -40,21 +40,41 @@ fun GameScreen(
     var frame by remember { mutableStateOf(0) }
 
     val birdRotation by animateFloatAsState(
-        targetValue = state.velocity * 900f,
+        targetValue = state.velocity * 1200f,
         label = "birdRotation"
     )
 
+    // HIGH FPS GAME LOOP
     LaunchedEffect(Unit) {
-        while (true) {
-            delay(16)
-            state = engine.update(state)
-        }
-    }
 
-    LaunchedEffect(Unit) {
+        var lastFrame = 0L
+        var animTimer = 0f
+
         while (true) {
-            delay(120)
-            frame = (frame + 1) % 3
+
+            withFrameNanos { now ->
+
+                if (lastFrame == 0L) {
+                    lastFrame = now
+                }
+
+                val delta =
+                    (now - lastFrame) / 1_000_000_000f
+
+                lastFrame = now
+
+                // update game
+                state = engine.update(state)
+
+                // animate bird
+                animTimer += delta
+
+                if (animTimer > 0.12f) {
+
+                    frame = (frame + 1) % 3
+                    animTimer = 0f
+                }
+            }
         }
     }
 
@@ -144,6 +164,7 @@ fun GameScreen(
                         )
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
+
                     Text(
                         text = "💰 ${state.kingdom.gold}",
                         color = Color(0xFFFFD700),
@@ -160,6 +181,7 @@ fun GameScreen(
                         )
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
+
                     Text(
                         text = "⭐ ${state.score}",
                         color = Color.White,

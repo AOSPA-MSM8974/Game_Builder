@@ -7,55 +7,67 @@ import kotlin.random.Random
 
 class FlappyEngine {
 
-    private val gravity = 0.0028f
-    private val flapForce = -0.035f
-    private val maxFallSpeed = 0.028f
+    // smoother physics
+    private val gravity = 0.0018f
+    private val flapForce = -0.026f
+    private val maxFallSpeed = 0.020f
+    private val liftDamping = 0.92f
 
     fun update(state: FlappyState): FlappyState {
 
         if (state.gameOver) return state
 
-        var velocity = state.velocity + gravity
+        // smooth velocity
+        var velocity = (state.velocity * liftDamping) + gravity
 
+        // cap fall speed
         if (velocity > maxFallSpeed) {
             velocity = maxFallSpeed
         }
 
+        // move bird
         val birdY = state.birdY + velocity
 
+        // move pipes
         val movedPipes = state.pipes
             .map {
-                it.copy(x = it.x - 0.006f)
+                it.copy(x = it.x - 0.005f)
             }
             .filter {
                 it.x > -0.25f
             }
 
-        val pipes = if (Random.nextFloat() < 0.018f) {
+        // spawn pipes
+        val pipes = if (Random.nextFloat() < 0.015f) {
+
             movedPipes + Pipe(
                 x = 1.2f,
-                gapY = Random.nextFloat() * 0.45f + 0.2f
+                gapY = Random.nextFloat() * 0.45f + 0.15f
             )
+
         } else {
             movedPipes
         }
 
         var dead = false
 
+        // world bounds
         if (birdY < 0f || birdY > 1f) {
             dead = true
         }
 
-        // PIPE COLLISION
+        // collision detection
         pipes.forEach { pipe ->
 
-            val pipeX = pipe.x
             val birdX = 0.12f
+            val pipeX = pipe.x
 
-            val touchingX = abs(pipeX - birdX) < 0.08f
+            // smaller hitbox
+            val touchingX = abs(pipeX - birdX) < 0.045f
 
+            // larger gap
             val gapTop = pipe.gapY
-            val gapBottom = pipe.gapY + 0.25f
+            val gapBottom = pipe.gapY + 0.32f
 
             val insideGap = birdY in gapTop..gapBottom
 
@@ -74,6 +86,7 @@ class FlappyEngine {
     }
 
     fun flap(state: FlappyState): FlappyState {
+
         if (state.gameOver) return state
 
         return state.copy(
@@ -83,7 +96,8 @@ class FlappyEngine {
 
     fun reward(state: FlappyState): FlappyState {
 
-        val goldEarned = (state.score * state.kingdom.goldMultiplier).toLong()
+        val goldEarned =
+            (state.score * state.kingdom.goldMultiplier).toLong()
 
         return state.copy(
             kingdom = state.kingdom.copy(

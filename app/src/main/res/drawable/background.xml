@@ -4,16 +4,34 @@
     android:viewportWidth="1080"
     android:viewportHeight="1920">
 
+    <!-- Sky -->
     <path
-        android:fillColor="#0B0B10"
+        android:fillColor="#6CC6FF"
         android:pathData="M0,0 H1080 V1920 H0 Z"/>
 
+    <!-- Hills -->
     <path
-        android:fillColor="#151522"
-        android:pathData="M0,1200 C250,1100 500,1300 800,1180 C950,1120 1030,1160 1080,1140 L1080,1920 L0,1920 Z"/>
+        android:fillColor="#6BCB77"
+        android:pathData="M0,1200
+                          C200,1000 400,1300 600,1150
+                          C800,1000 950,1200 1080,1100
+                          L1080,1920
+                          L0,1920 Z"/>
 
+    <!-- Ground -->
     <path
-        android:fillColor="#111111"
-        android:pathData="M0,1500 H1080 V1920 H0 Z"/>
+        android:fillColor="#3FA34D"
+        android:pathData="M0,1550 H1080 V1920 H0 Z"/>
+
+    <!-- Cloud -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M180,250
+                          C180,210 220,190 260,210
+                          C270,170 330,170 350,210
+                          C390,210 410,240 410,270
+                          C410,310 380,330 340,330
+                          H240
+                          C200,330 180,300 180,250 Z"/>
 
 </vector>
