@@ -5,6 +5,7 @@ plugins {
 }
 
 android {
+    namespace = "com.new.flappybird"
     compileSdk = 34
 
     defaultConfig {
