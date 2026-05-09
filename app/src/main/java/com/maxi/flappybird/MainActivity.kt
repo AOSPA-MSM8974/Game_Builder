@@ -1,4 +1,4 @@
-package com.maxi.flappybird
+package com.example.flappybird
 
 import android.content.Context
 import android.graphics.*
