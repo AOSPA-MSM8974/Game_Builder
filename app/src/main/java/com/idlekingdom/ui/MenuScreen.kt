@@ -1,10 +1,20 @@
 package com.idlekingdom.ui
 
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.idlekingdom.R
 import com.idlekingdom.model.KingdomState
 
 @Composable
@@ -14,20 +24,57 @@ fun MenuScreen(
     onUpgrade: () -> Unit
 ) {
 
-    Column(Modifier.padding(16.dp)) {
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        Text("🏰 Flappy Kingdom")
+        Image(
+            painter = painterResource(R.drawable.background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        Spacer(Modifier.height(20.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
 
-        Text("💰 Gold: ${kingdom.gold}")
+            Text(
+                text = "🏰 FLAPPY KINGDOM",
+                color = Color(0xFFFFD700),
+                fontSize = 36.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
 
-        Button(onClick = onPlay) {
-            Text("▶ Play")
-        }
+            Spacer(modifier = Modifier.height(18.dp))
 
-        Button(onClick = onUpgrade) {
-            Text("⬆ Upgrade")
+            Box(
+                modifier = Modifier
+                    .background(
+                        Color(0xAA111111),
+                        RoundedCornerShape(18.dp)
+                    )
+                    .padding(20.dp)
+            ) {
+                Text(
+                    text = "Gold: ${kingdom.gold}",
+                    color = Color.White,
+                    fontSize = 24.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Button(onClick = onPlay) {
+                Text("⚔ Enter Battle")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(onClick = onUpgrade) {
+                Text("⬆ Upgrade Kingdom")
+            }
         }
     }
 }

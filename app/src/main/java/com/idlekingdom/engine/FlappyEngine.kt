@@ -1,32 +1,73 @@
 package com.idlekingdom.engine
 
-import com.idlekingdom.model.*
+import com.idlekingdom.model.FlappyState
+import com.idlekingdom.model.Pipe
+import kotlin.math.abs
 import kotlin.random.Random
 
 class FlappyEngine {
+
+    private val gravity = 0.0028f
+    private val flapForce = -0.035f
+    private val maxFallSpeed = 0.028f
 
     fun update(state: FlappyState): FlappyState {
 
         if (state.gameOver) return state
 
-        val gravity = state.kingdom.gravity
-        val newVelocity = state.velocity + gravity
-        val newY = state.birdY + newVelocity
+        var velocity = state.velocity + gravity
 
-        val pipes = state.pipes
-            .map { it.copy(x = it.x - 0.01f) }
-            .filter { it.x > -0.2f }
+        if (velocity > maxFallSpeed) {
+            velocity = maxFallSpeed
+        }
 
-        val spawn = if (Random.nextFloat() < 0.02f) {
-            pipes + Pipe(1.2f, Random.nextFloat())
-        } else pipes
+        val birdY = state.birdY + velocity
 
-        val dead = newY < 0f || newY > 1f
+        val movedPipes = state.pipes
+            .map {
+                it.copy(x = it.x - 0.006f)
+            }
+            .filter {
+                it.x > -0.25f
+            }
+
+        val pipes = if (Random.nextFloat() < 0.018f) {
+            movedPipes + Pipe(
+                x = 1.2f,
+                gapY = Random.nextFloat() * 0.45f + 0.2f
+            )
+        } else {
+            movedPipes
+        }
+
+        var dead = false
+
+        if (birdY < 0f || birdY > 1f) {
+            dead = true
+        }
+
+        // PIPE COLLISION
+        pipes.forEach { pipe ->
+
+            val pipeX = pipe.x
+            val birdX = 0.12f
+
+            val touchingX = abs(pipeX - birdX) < 0.08f
+
+            val gapTop = pipe.gapY
+            val gapBottom = pipe.gapY + 0.25f
+
+            val insideGap = birdY in gapTop..gapBottom
+
+            if (touchingX && !insideGap) {
+                dead = true
+            }
+        }
 
         return state.copy(
-            birdY = newY,
-            velocity = newVelocity,
-            pipes = spawn,
+            birdY = birdY,
+            velocity = velocity,
+            pipes = pipes,
             score = state.score + 1,
             gameOver = dead
         )
@@ -34,15 +75,19 @@ class FlappyEngine {
 
     fun flap(state: FlappyState): FlappyState {
         if (state.gameOver) return state
-        return state.copy(velocity = -0.04f)
+
+        return state.copy(
+            velocity = flapForce
+        )
     }
 
     fun reward(state: FlappyState): FlappyState {
-        val gold = (state.score * state.kingdom.goldMultiplier).toLong()
+
+        val goldEarned = (state.score * state.kingdom.goldMultiplier).toLong()
 
         return state.copy(
             kingdom = state.kingdom.copy(
-                gold = state.kingdom.gold + gold
+                gold = state.kingdom.gold + goldEarned
             )
         )
     }

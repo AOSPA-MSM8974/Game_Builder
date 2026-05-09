@@ -4,22 +4,14 @@
     android:viewportWidth="1080"
     android:viewportHeight="1920">
 
-    <!-- Background -->
     <path
         android:fillColor="#0B0B10"
         android:pathData="M0,0 H1080 V1920 H0 Z"/>
 
-    <!-- Mist -->
     <path
-        android:fillColor="#1A1A2E"
-        android:fillAlpha="0.35"
-        android:pathData="M0,400
-                          C200,300 400,500 600,400
-                          C800,300 900,450 1080,380
-                          L1080,0
-                          L0,0 Z"/>
+        android:fillColor="#151522"
+        android:pathData="M0,1200 C250,1100 500,1300 800,1180 C950,1120 1030,1160 1080,1140 L1080,1920 L0,1920 Z"/>
 
-    <!-- Ground -->
     <path
         android:fillColor="#111111"
         android:pathData="M0,1500 H1080 V1920 H0 Z"/>
