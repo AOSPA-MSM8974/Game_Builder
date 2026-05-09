@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: ["v2"]
+    branches: ["rpg"]
   workflow_dispatch:
 
 jobs:
