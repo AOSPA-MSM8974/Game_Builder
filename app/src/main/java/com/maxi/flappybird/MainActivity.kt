@@ -559,14 +559,7 @@ class RocketGame {
             }
         }
         
-        // Efficient pipe removal
-        particlesToRemove.clear()
-        for (pipe in pipes) {
-            if (pipe.x + Config.PIPE_WIDTH < -100f) {
-                particlesToRemove.add(pipe as Particle?) // Type mismatch workaround
-            }
-        }
-        // Actually remove pipes
+        // Efficient pipe removal - just remove off-screen pipes
         pipes.removeAll { it.x + Config.PIPE_WIDTH < -100f }
 
         if (pipes.isEmpty() || pipes.last().x < sw - Config.PIPE_DISTANCE) {
