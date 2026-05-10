@@ -627,27 +627,14 @@ class RocketGame {
 
     private fun updateParticles(dt: Float) {
         val iter = particles.iterator()
-
         while (iter.hasNext()) {
             val p = iter.next()
-
             p.life -= dt / p.maxLife
-            if (p.life <= 0f) {
-                iter.remove()
-                continue
-            }
-
+            if (p.life <= 0f) { iter.remove(); continue }
             p.x += p.vx * dt
             p.y += p.vy * dt
-
-            when (p.type) {
-                ParticleType.SPARK -> p.vy += 600f * dt
-                ParticleType.SMOKE -> {
-                    p.vx *= (1f - dt * 3f).coerceAtLeast(0f)
-                    p.size = (p.size + dt * 10f).coerceAtMost(40f)
-                }
-                else -> {}
-            }
+            if (p.type == ParticleType.SPARK) p.vy += 600f * dt
+            if (p.type == ParticleType.SMOKE) { p.vx *= (1f - dt * 3f); p.size *= (1f + dt * 1.5f) }
         }
     }
 
