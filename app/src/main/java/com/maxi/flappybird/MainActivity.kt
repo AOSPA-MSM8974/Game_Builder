@@ -183,8 +183,8 @@ class GameThread(
             }
 
             val elapsed = (System.nanoTime() - now) / 1_000_000L
-            val sleep = Config.FRAME_TIME - elapsed
-            if (sleep > 0) sleep(sleep)
+            val sleepTime = Config.FRAME_TIME - elapsed
+            if (sleepTime > 0) Thread.sleep(sleepTime)
         }
     }
 }
