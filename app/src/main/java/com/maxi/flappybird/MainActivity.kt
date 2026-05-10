@@ -98,8 +98,8 @@ data class Particle(
     var life: Float,       // 0-1
     var maxLife: Float,
     val color: Int,
-    val size: Float,
-    val type: ParticleType
+    var size: Float,
+    var type: ParticleType
 )
 
 enum class ParticleType { SPARK, SMOKE, STAR }
