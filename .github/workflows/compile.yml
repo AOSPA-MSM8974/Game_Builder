@@ -26,6 +26,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Task copyAndroidNatives
+        run: ./gradlew android:copyAndroidNatives
+
       - name: Build debug APK
         run: ./gradlew :android:assembleDebug --stacktrace
 
