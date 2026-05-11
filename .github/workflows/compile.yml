@@ -36,8 +36,14 @@ jobs:
           path: android/build/outputs/apk/debug/**.apk
           retention-days: 14
 
-      - name: Check APK files
-        run: unzip -l android/build/outputs/apk/debug/*.apk | grep libgdx
+      - name: Check APK contents
+        run: |
+          echo "Listing APK contents..."
+          APK=$(find . -name "*.apk" | head -n 1)
+          echo "APK found: $APK"
+
+          unzip -l "$APK" > apk_contents.txt
+          cat apk_contents.txt
 
   release:
     name: Build & Sign Release APK
