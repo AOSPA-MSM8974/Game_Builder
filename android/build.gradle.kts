@@ -56,18 +56,23 @@ dependencies {
     implementation(libs.gdx.backend.android)
     implementation(libs.kotlin.stdlib)
 
+    // ✅ CORRECT: gdx natives (NOT box2d for natives)
     natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-arm64-v8a")
     natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86")
     natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86_64")
 
-    natives("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}:natives-armeabi-v7a")
-    natives("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}:natives-x86_64")
+    // Box2D core only (NO natives here)
+    implementation("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}")
+
+    // Box2D natives (correct module)
+    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-armeabi-v7a")
+    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-arm64-v8a")
+    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-x86")
+    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-x86_64")
 }
 
-/* ---------------- FIXED COPY TASK ---------------- */
+/* ================= FIXED TASK ================= */
 
 abstract class CopyAndroidNativesTask @Inject constructor(
     private val fs: FileSystemOperations,
@@ -109,7 +114,7 @@ abstract class CopyAndroidNativesTask @Inject constructor(
     }
 }
 
-/* ---------------- TASK WIRING ---------------- */
+/* ================= TASK WIRING ================= */
 
 tasks.register<CopyAndroidNativesTask>("copyAndroidNatives") {
 
