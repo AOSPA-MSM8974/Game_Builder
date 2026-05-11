@@ -1,17 +1,7 @@
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.ArchiveOperations
-import org.gradle.api.file.ConfigurableFileCollection
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.FileSystemOperations
-import org.gradle.api.tasks.*
-import javax.inject.Inject
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
-
-val natives: Configuration by configurations.creating
 
 android {
 
@@ -52,79 +42,24 @@ dependencies {
 
     implementation(project(":core"))
 
-    implementation(libs.gdx.core)
-    implementation(libs.gdx.backend.android)
+    // libGDX core
+    implementation("com.badlogicgames.gdx:gdx:1.12.1")
+    implementation("com.badlogicgames.gdx:gdx-backend-android:1.12.1")
+
+    // libGDX natives (THIS is what loads libgdx.so)
+    implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-armeabi-v7a")
+    implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-arm64-v8a")
+    implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-x86")
+    implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-x86_64")
+
+    // Box2D physics core
+    implementation("com.badlogicgames.gdx:gdx-box2d:1.12.1")
+
+    // Box2D natives
+    implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-armeabi-v7a")
+    implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-arm64-v8a")
+    implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-x86")
+    implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-x86_64")
+
     implementation(libs.kotlin.stdlib)
-
-    // ✅ CORRECT: gdx natives (NOT box2d for natives)
-    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-armeabi-v7a")
-    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86_64")
-
-    // Box2D core only (NO natives here)
-    implementation("com.badlogicgames.gdx:gdx-box2d:${libs.versions.gdx.get()}")
-
-    // Box2D natives (correct module)
-    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-armeabi-v7a")
-    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-box2d-platform:${libs.versions.gdx.get()}:natives-x86_64")
-}
-
-/* ================= FIXED TASK ================= */
-
-abstract class CopyAndroidNativesTask @Inject constructor(
-    private val fs: FileSystemOperations,
-    private val archives: ArchiveOperations
-) : DefaultTask() {
-
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.NONE)
-    abstract val nativeFiles: ConfigurableFileCollection
-
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun run() {
-
-        val abiMap = mapOf(
-            "natives-armeabi-v7a" to "armeabi-v7a",
-            "natives-arm64-v8a" to "arm64-v8a",
-            "natives-x86" to "x86",
-            "natives-x86_64" to "x86_64"
-        )
-
-        nativeFiles.forEach { jar ->
-
-            val abi = abiMap.entries
-                .firstOrNull { jar.name.contains(it.key) }
-                ?.value ?: return@forEach
-
-            val outDir = outputDir.dir(abi).get().asFile
-            outDir.mkdirs()
-
-            fs.copy {
-                from(archives.zipTree(jar))
-                into(outDir)
-                include("*.so")
-            }
-        }
-    }
-}
-
-/* ================= TASK WIRING ================= */
-
-tasks.register<CopyAndroidNativesTask>("copyAndroidNatives") {
-
-    nativeFiles.from(natives)
-
-    outputDir.set(
-        layout.buildDirectory.dir("androidNatives")
-    )
-}
-
-tasks.named("preBuild") {
-    dependsOn("copyAndroidNatives")
 }
