@@ -36,6 +36,9 @@ jobs:
           path: android/build/outputs/apk/debug/**.apk
           retention-days: 14
 
+      - name: Check APK files
+        run: unzip -l android/build/outputs/apk/debug/*.apk | grep libgdx
+
   release:
     name: Build & Sign Release APK
     runs-on: ubuntu-latest
