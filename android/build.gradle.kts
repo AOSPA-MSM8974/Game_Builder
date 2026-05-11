@@ -1,3 +1,8 @@
+import org.gradle.api.file.ArchiveOperations
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.tasks.TaskAction
+import javax.inject.Inject
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -44,25 +49,38 @@ dependencies {
     natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86_64")
 }
 
-tasks.register("copyAndroidNatives") {
-    doLast {
+abstract class CopyAndroidNativesTask @Inject constructor(
+    private val fs: FileSystemOperations,
+    private val archives: ArchiveOperations
+) : DefaultTask() {
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val nativeFiles: ConfigurableFileCollection
+
+    @TaskAction
+    fun run() {
         val abiMap = mapOf(
             "natives-armeabi-v7a" to "armeabi-v7a",
             "natives-arm64-v8a"   to "arm64-v8a",
             "natives-x86"         to "x86",
             "natives-x86_64"      to "x86_64"
         )
-        configurations["natives"].resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
+        nativeFiles.forEach { jar ->
             val abi = abiMap.entries
-                .firstOrNull { artifact.file.name.contains(it.key) }?.value ?: return@forEach
-            val outDir = file("libs/$abi").also { it.mkdirs() }
-            copy {
-                from(zipTree(artifact.file))
+                .firstOrNull { jar.name.contains(it.key) }?.value ?: return@forEach
+            val outDir = project.file("libs/$abi").also { it.mkdirs() }
+            fs.copy {
+                from(archives.zipTree(jar))
                 into(outDir)
                 include("*.so")
             }
         }
     }
+}
+
+tasks.register<CopyAndroidNativesTask>("copyAndroidNatives") {
+    nativeFiles.from(natives)
 }
 
 tasks.configureEach {
