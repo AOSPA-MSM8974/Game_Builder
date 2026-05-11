@@ -69,14 +69,14 @@ abstract class CopyAndroidNativesTask @Inject constructor(
 
     @TaskAction
     fun run() {
-        val abiMap = mapOf(
+        // x86_64 MUST come before x86 to avoid substring mismatch
+        val abiMap = linkedMapOf(
             "natives-armeabi-v7a" to "armeabi-v7a",
             "natives-arm64-v8a"   to "arm64-v8a",
-            "natives-x86"         to "x86",
-            "natives-x86_64"      to "x86_64"
+            "natives-x86_64"      to "x86_64",
+            "natives-x86"         to "x86"
         )
 
-        // Verify we actually have native jars to process
         val allJars = nativeFiles.files
         if (allJars.isEmpty()) {
             throw GradleException(
@@ -98,7 +98,6 @@ abstract class CopyAndroidNativesTask @Inject constructor(
             val abi = entry.value
             val outDir = outputDir.dir(abi).get().asFile.also { it.mkdirs() }
 
-            // Count .so files before and after to verify something was actually copied
             val before = outDir.listFiles()?.count { it.extension == "so" } ?: 0
 
             fs.copy {
@@ -120,7 +119,6 @@ abstract class CopyAndroidNativesTask @Inject constructor(
             logger.lifecycle("copyAndroidNatives: copied ${after - before} .so file(s) for $abi")
         }
 
-        // Verify every expected ABI was covered
         val missingAbis = expectedAbis - copiedAbis
         if (missingAbis.isNotEmpty()) {
             throw GradleException(
