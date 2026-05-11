@@ -1,5 +1,13 @@
+import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.ArchiveOperations
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import javax.inject.Inject
 
@@ -11,6 +19,7 @@ plugins {
 val natives: Configuration by configurations.creating
 
 android {
+
     namespace = "com.stickrun.game"
     compileSdk = 34
 
@@ -39,7 +48,9 @@ android {
 }
 
 dependencies {
+
     implementation(project(":core"))
+
     implementation(libs.kotlin.stdlib)
     implementation(libs.gdx.backend.android)
 
@@ -58,21 +69,32 @@ abstract class CopyAndroidNativesTask @Inject constructor(
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val nativeFiles: ConfigurableFileCollection
 
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
     @TaskAction
     fun run() {
+
         val abiMap = mapOf(
             "natives-armeabi-v7a" to "armeabi-v7a",
-            "natives-arm64-v8a"   to "arm64-v8a",
-            "natives-x86"         to "x86",
-            "natives-x86_64"      to "x86_64"
+            "natives-arm64-v8a" to "arm64-v8a",
+            "natives-x86" to "x86",
+            "natives-x86_64" to "x86_64"
         )
+
         nativeFiles.forEach { jar ->
+
             val abi = abiMap.entries
-                .firstOrNull { jar.name.contains(it.key) }?.value ?: return@forEach
-            val outDir = project.file("libs/$abi").also { it.mkdirs() }
+                .firstOrNull { jar.name.contains(it.key) }
+                ?.value ?: return@forEach
+
+            val abiDir = outputDir.dir(abi).get().asFile
+
+            abiDir.mkdirs()
+
             fs.copy {
                 from(archives.zipTree(jar))
-                into(outDir)
+                into(abiDir)
                 include("*.so")
             }
         }
@@ -80,9 +102,14 @@ abstract class CopyAndroidNativesTask @Inject constructor(
 }
 
 tasks.register<CopyAndroidNativesTask>("copyAndroidNatives") {
+
     nativeFiles.from(natives)
+
+    outputDir.set(
+        layout.buildDirectory.dir("androidNatives")
+    )
 }
 
-tasks.configureEach {
-    if (name == "preBuild") dependsOn("copyAndroidNatives")
+tasks.named("preBuild") {
+    dependsOn("copyAndroidNatives")
 }
