@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-// Separate configuration for LibGDX native .so files
 val natives: Configuration by configurations.creating
 
 android {
@@ -39,14 +38,12 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.gdx.backend.android)
 
-    // Native .so libs — one per ABI
-    natives(libs.gdx.platform.armeabi.v7a) { artifact { classifier = "natives-armeabi-v7a" } }
-    natives(libs.gdx.platform.arm64.v8a)   { artifact { classifier = "natives-arm64-v8a"   } }
-    natives(libs.gdx.platform.x86)         { artifact { classifier = "natives-x86"          } }
-    natives(libs.gdx.platform.x86.64)      { artifact { classifier = "natives-x86-64"       } }
+    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-armeabi-v7a")
+    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-arm64-v8a")
+    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86")
+    natives("com.badlogicgames.gdx:gdx-platform:${libs.versions.gdx.get()}:natives-x86_64")
 }
 
-// Unpack .so files from the native JARs into android/libs/<abi>/
 tasks.register("copyAndroidNatives") {
     doLast {
         val abiMap = mapOf(
@@ -56,7 +53,8 @@ tasks.register("copyAndroidNatives") {
             "natives-x86_64"      to "x86_64"
         )
         natives.resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
-            val abi = abiMap.entries.firstOrNull { artifact.name.contains(it.key) }?.value ?: return@forEach
+            val abi = abiMap.entries
+                .firstOrNull { artifact.file.name.contains(it.key) }?.value ?: return@forEach
             val outDir = file("libs/$abi").also { it.mkdirs() }
             copy {
                 from(zipTree(artifact.file))
@@ -67,7 +65,6 @@ tasks.register("copyAndroidNatives") {
     }
 }
 
-// Auto-run before every build so you never have to think about it
 tasks.configureEach {
     if (name == "preBuild") dependsOn("copyAndroidNatives")
 }
