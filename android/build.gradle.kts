@@ -52,7 +52,7 @@ tasks.register("copyAndroidNatives") {
             "natives-x86"         to "x86",
             "natives-x86_64"      to "x86_64"
         )
-        natives.resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
+        configurations["natives"].resolvedConfiguration.resolvedArtifacts.forEach { artifact ->
             val abi = abiMap.entries
                 .firstOrNull { artifact.file.name.contains(it.key) }?.value ?: return@forEach
             val outDir = file("libs/$abi").also { it.mkdirs() }
