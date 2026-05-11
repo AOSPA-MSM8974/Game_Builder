@@ -42,17 +42,17 @@ dependencies {
 
     implementation(project(":core"))
 
-    // libGDX core
+    // core libGDX (IMPORTANT: DO NOT use catalog for now)
     implementation("com.badlogicgames.gdx:gdx:1.12.1")
     implementation("com.badlogicgames.gdx:gdx-backend-android:1.12.1")
 
-    // libGDX natives (THIS is what loads libgdx.so)
+    // natives (THIS is what provides libgdx.so)
     implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-armeabi-v7a")
     implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-arm64-v8a")
     implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-x86")
     implementation("com.badlogicgames.gdx:gdx-platform:1.12.1:natives-x86_64")
 
-    // Box2D physics core
+    // Box2D core
     implementation("com.badlogicgames.gdx:gdx-box2d:1.12.1")
 
     // Box2D natives
@@ -60,6 +60,4 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-arm64-v8a")
     implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-x86")
     implementation("com.badlogicgames.gdx:gdx-box2d-platform:1.12.1:natives-x86_64")
-
-    implementation(libs.kotlin.stdlib)
 }
