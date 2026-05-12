@@ -16,258 +16,172 @@ import com.stickrun.game.entities.Player
 
 class MenuScreen(private val game: StickRunGame) : Screen {
 
-    companion object {
-        const val VW = 1920f
-        const val VH = 1080f
-    }
+    companion object { const val VW = 1920f; const val VH = 1080f }
 
-    private val camera = OrthographicCamera(VW, VH)
-    private val font   = BitmapFont()
-    private val layout = GlyphLayout()
+    private val camera  = OrthographicCamera(VW, VH)
+    private val font    = BitmapFont()
+    private val layout  = GlyphLayout()
+    private val preview = Player(920f, Player.GROUND_Y)
+    private var anim    = 0f
+    private var selHat  = 1   // default TOP_HAT
+    private var selBody = 0
+    private var selShoe = 0
 
-    private val preview   = Player(900f, Player.GROUND_Y)
-    private var anim      = 0f
-
-    private var selHat    = 0
-    private var selColor  = 0
-
-    private val hatTypes = Player.HatType.values()
-
+    private val hatTypes  = Player.HatType.values()
     private val bodyColors = listOf(
-        Color(0.08f, 0.08f, 0.08f, 1f),
-        Color(0.58f, 0.10f, 0.10f, 1f),
-        Color(0.10f, 0.26f, 0.58f, 1f),
-        Color(0.10f, 0.46f, 0.14f, 1f),
-        Color(0.46f, 0.24f, 0.04f, 1f),
-        Color(0.36f, 0.06f, 0.42f, 1f),
-        Color(0.08f, 0.34f, 0.44f, 1f),
-        Color(0.44f, 0.36f, 0.04f, 1f),
+        Color(0.05f,0.05f,0.05f,1f), Color(0.55f,0.10f,0.10f,1f),
+        Color(0.10f,0.24f,0.55f,1f), Color(0.10f,0.44f,0.14f,1f),
+        Color(0.44f,0.22f,0.04f,1f), Color(0.34f,0.06f,0.40f,1f),
     )
-    private val hatColors = listOf(
-        Color(0.76f, 0.10f, 0.10f, 1f),
-        Color(0.10f, 0.24f, 0.76f, 1f),
-        Color(0.10f, 0.54f, 0.14f, 1f),
-        Color(0.56f, 0.44f, 0.04f, 1f),
-        Color(0.46f, 0.06f, 0.46f, 1f),
-        Color(0.06f, 0.06f, 0.06f, 1f),
-        Color(0.06f, 0.32f, 0.42f, 1f),
-        Color(0.42f, 0.34f, 0.04f, 1f),
+    private val shoeColors = listOf(
+        Color(0.15f,0.72f,0.15f,1f), Color(0.85f,0.15f,0.15f,1f),
+        Color(0.15f,0.30f,0.85f,1f), Color(0.85f,0.72f,0.10f,1f),
+        Color(1.00f,1.00f,1.00f,1f), Color(0.05f,0.05f,0.05f,1f),
     )
 
-    // UI hit rects (1920x1080 space)
-    private val playBtn   = Rectangle(760f,  80f,  400f, 110f)
-    private val hatPrev   = Rectangle(660f,  536f,  72f,  64f)
-    private val hatNext   = Rectangle(1188f, 536f,  72f,  64f)
-    private val colPrev   = Rectangle(660f,  424f,  72f,  64f)
-    private val colNext   = Rectangle(1188f, 424f,  72f,  64f)
+    private val playBtn  = Rectangle(760f,  80f, 400f, 110f)
+    private val hatL     = Rectangle(660f, 530f,  70f,  62f)
+    private val hatR     = Rectangle(1190f,530f,  70f,  62f)
+    private val bodyL    = Rectangle(660f, 418f,  70f,  62f)
+    private val bodyR    = Rectangle(1190f,418f,  70f,  62f)
+    private val shoeL    = Rectangle(660f, 306f,  70f,  62f)
+    private val shoeR    = Rectangle(1190f,306f,  70f,  62f)
 
     init {
         camera.position.set(VW/2f, VH/2f, 0f); camera.update()
         font.data.setScale(2.2f)
-        preview.onGround = true
+        preview.onGround = true; preview.hatType = Player.HatType.TOP_HAT
     }
 
     override fun render(delta: Float) {
         anim += delta
-
-        Gdx.gl.glClearColor(0.06f, 0.02f, 0f, 1f)
+        Gdx.gl.glClearColor(0.96f, 0.62f, 0.10f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
         handleInput()
 
-        preview.bodyColor = bodyColors[selColor]
-        preview.hatType   = hatTypes[selHat]
-        preview.hatColor  = hatColors[selColor]
-        preview.animTimer = anim
+        preview.bodyColor  = bodyColors[selBody]
+        preview.hatType    = hatTypes[selHat]
+        preview.hatColor   = bodyColors[selBody]
+        preview.shoeColor  = shoeColors[selShoe]
+        preview.animTimer  = anim
 
-        val sr  = game.shape
-        val bat = game.batch
-
+        val sr = game.shape; val bat = game.batch
         sr.projectionMatrix = camera.combined
         sr.begin(ShapeRenderer.ShapeType.Filled)
-        drawSky(sr)
-        drawGround(sr)
-        drawDecoSilhouettes(sr)
-        drawPanelBg(sr)
-        drawColorSwatches(sr)
-        drawArrow(sr, hatPrev,  false)
-        drawArrow(sr, hatNext,  true)
-        drawArrow(sr, colPrev,  false)
-        drawArrow(sr, colNext,  true)
+        drawSky(sr); drawGround(sr); drawPanel(sr)
+        drawArrow(sr, hatL, false);  drawArrow(sr, hatR,  true)
+        drawArrow(sr, bodyL,false);  drawArrow(sr, bodyR, true)
+        drawArrow(sr, shoeL,false);  drawArrow(sr, shoeR, true)
+        drawSwatches(sr, bodyColors, bodyL.x + 80f, 424f)
+        drawSwatches(sr, shoeColors, shoeL.x + 80f, 312f)
         drawPlayBtn(sr)
         preview.draw(sr)
         sr.end()
 
         bat.projectionMatrix = camera.combined
         bat.begin()
-        drawLogo(bat)
+        // Logo
+        bat.draw(Assets.logo, VW/2f - 340f, VH - 200f, 680f, 153f)
         drawText(bat)
         bat.end()
     }
 
     private fun handleInput() {
         if (!Gdx.input.justTouched()) return
-        val rx = Gdx.input.x.toFloat() / Gdx.graphics.width.toFloat() * VW
+        val rx = Gdx.input.x.toFloat() / Gdx.graphics.width.toFloat()  * VW
         val ry = (1f - Gdx.input.y.toFloat() / Gdx.graphics.height.toFloat()) * VH
         when {
             playBtn.contains(rx,ry)  -> launch()
-            hatPrev.contains(rx,ry)  -> selHat   = (selHat   - 1 + hatTypes.size)   % hatTypes.size
-            hatNext.contains(rx,ry)  -> selHat   = (selHat   + 1)                   % hatTypes.size
-            colPrev.contains(rx,ry)  -> selColor = (selColor - 1 + bodyColors.size) % bodyColors.size
-            colNext.contains(rx,ry)  -> selColor = (selColor + 1)                   % bodyColors.size
+            hatL.contains(rx,ry)     -> selHat  = (selHat  - 1 + hatTypes.size)    % hatTypes.size
+            hatR.contains(rx,ry)     -> selHat  = (selHat  + 1)                    % hatTypes.size
+            bodyL.contains(rx,ry)    -> selBody = (selBody - 1 + bodyColors.size)  % bodyColors.size
+            bodyR.contains(rx,ry)    -> selBody = (selBody + 1)                    % bodyColors.size
+            shoeL.contains(rx,ry)    -> selShoe = (selShoe - 1 + shoeColors.size)  % shoeColors.size
+            shoeR.contains(rx,ry)    -> selShoe = (selShoe + 1)                    % shoeColors.size
         }
     }
 
     private fun launch() {
         val gs = GameScreen(game)
-        gs.applyCustomization(bodyColors[selColor], hatTypes[selHat], hatColors[selColor])
+        gs.applyCustomization(bodyColors[selBody], hatTypes[selHat], bodyColors[selBody], shoeColors[selShoe])
         game.setScreen(gs)
     }
 
     private fun drawSky(sr: ShapeRenderer) {
-        sr.color = Color(0.94f,0.40f,0.03f,1f); sr.rect(0f,0f,       VW,VH*0.28f)
-        sr.color = Color(0.96f,0.54f,0.08f,1f); sr.rect(0f,VH*0.28f, VW,VH*0.30f)
-        sr.color = Color(0.90f,0.66f,0.18f,1f); sr.rect(0f,VH*0.58f, VW,VH*0.24f)
-        sr.color = Color(0.96f,0.82f,0.36f,1f); sr.rect(0f,VH*0.82f, VW,VH*0.18f)
-        val sx = VW*0.84f; val sy = VH*0.90f
-        sr.color = Color(1f,0.88f,0.26f,0.08f); sr.circle(sx,sy,150f,24)
-        sr.color = Color(1f,0.90f,0.32f,0.14f); sr.circle(sx,sy,110f,24)
-        sr.color = Color(1f,0.92f,0.40f,0.90f); sr.circle(sx,sy, 72f,24)
-        sr.color = Color(1f,1.00f,0.72f,0.86f); sr.circle(sx,sy, 42f,18)
+        sr.color = Color(0.99f,0.78f,0.22f,1f); sr.rect(0f,VH*0.65f,VW,VH*0.35f)
+        sr.color = Color(0.98f,0.68f,0.12f,1f); sr.rect(0f,VH*0.35f,VW,VH*0.30f)
+        sr.color = Color(0.96f,0.58f,0.08f,1f); sr.rect(0f,96f,VW,VH*0.35f)
     }
 
     private fun drawGround(sr: ShapeRenderer) {
-        sr.color = Color(0.16f,0.06f,0.01f,1f); sr.rect(0f,0f,               VW,Player.GROUND_Y)
-        sr.color = Color(0.32f,0.13f,0.03f,1f); sr.rect(0f,Player.GROUND_Y-8f,VW,14f)
-        sr.color = Color(0.48f,0.20f,0.05f,1f); sr.rect(0f,Player.GROUND_Y+4f,VW,6f)
-    }
-
-    private fun drawDecoSilhouettes(sr: ShapeRenderer) {
-        // Building silhouettes
-        val bldgs = listOf(150f to 190f, 340f to 130f, 1580f to 170f, 1720f to 110f, 1820f to 200f)
-        for ((bx,bh) in bldgs) {
-            sr.color = Color(0.58f,0.22f,0.03f,0.18f)
-            sr.rect(bx, Player.GROUND_Y, 100f, bh)
+        sr.color = Color(0.78f,0.78f,0.80f,1f); sr.rect(0f,0f,VW,96f)
+        sr.color = Color(0.68f,0.68f,0.70f,1f)
+        var x = 0f
+        while (x < VW + 96f) {
+            sr.rectLine(x, 0f, x + 96f, 96f, 8f)
+            x += 16f
         }
-        // Deco crates on the ground
-        sr.color = Color(0.50f,0.24f,0.06f,0.50f)
-        sr.rect(260f, Player.GROUND_Y, 96f, 96f)
-        sr.rect(1600f,Player.GROUND_Y, 96f,192f)
-        sr.rect(1710f,Player.GROUND_Y, 96f, 96f)
-        // Top highlight on deco crates
-        sr.color = Color(0.70f,0.38f,0.12f,0.40f)
-        sr.rect(260f, Player.GROUND_Y+88f, 96f, 8f)
-        sr.rect(1600f,Player.GROUND_Y+184f,96f, 8f)
-        sr.rect(1710f,Player.GROUND_Y+88f, 96f, 8f)
+        sr.color = Color(0.85f,0.85f,0.86f,1f); sr.rect(0f,90f,VW,6f)
     }
 
-    private fun drawPanelBg(sr: ShapeRenderer) {
-        // Customize panel
-        sr.color = Color(0f,0f,0f,0.55f)
-        sr.rect(636f, 388f, 648f, 280f)
-        // Accent borders
-        sr.color = Color(1f,0.65f,0.10f,0.60f)
-        sr.rect(636f, 666f, 648f, 4f)
-        sr.rect(636f, 388f, 648f, 4f)
-        sr.rect(636f, 388f, 4f,   280f)
-        sr.rect(1280f,388f, 4f,   280f)
-        // Preview box
-        sr.color = Color(0f,0f,0f,0.30f)
-        sr.rect(840f, Player.GROUND_Y-4f, 240f, Player.H+50f)
-        sr.color = Color(1f,0.65f,0.10f,0.25f)
-        sr.rect(840f, Player.GROUND_Y-4f, 240f, 4f)
-    }
-
-    private fun drawColorSwatches(sr: ShapeRenderer) {
-        val sx0 = 740f; val sy = 400f; val size = 48f; val gap = 12f
-        for (i in bodyColors.indices) {
-            val bx = sx0 + i*(size+gap)
-            if (i == selColor) {
-                sr.color = Color(1f,0.88f,0.28f,1f)
-                sr.rect(bx-5f, sy-5f, size+10f, size+10f)
-            }
-            sr.color = bodyColors[i]
-            sr.rect(bx, sy, size, size)
-        }
+    private fun drawPanel(sr: ShapeRenderer) {
+        sr.color = Color(0f,0f,0f,0.48f); sr.rect(630f,280f,660f,330f)
+        sr.color = Color(1f,0.70f,0.12f,0.65f)
+        sr.rect(630f,608f,660f,4f); sr.rect(630f,280f,660f,4f)
+        sr.rect(630f,280f,4f,332f); sr.rect(1286f,280f,4f,332f)
+        // Preview bg
+        sr.color = Color(0f,0f,0f,0.22f); sr.rect(850f,90f,220f,Player.H+60f)
     }
 
     private fun drawArrow(sr: ShapeRenderer, r: Rectangle, right: Boolean) {
-        sr.color = Color(0.60f,0.28f,0.07f,0.90f)
-        sr.rect(r.x, r.y, r.width, r.height)
-        sr.color = Color(1f,0.76f,0.28f,0.35f)
-        sr.rect(r.x, r.y+r.height-10f, r.width, 10f)
-        sr.color = Color(1f,0.90f,0.38f,1f)
-        if (right)
-            sr.triangle(r.x+14f, r.y+10f, r.x+14f, r.y+r.height-10f, r.x+r.width-10f, r.y+r.height/2f)
-        else
-            sr.triangle(r.x+r.width-14f, r.y+10f, r.x+r.width-14f, r.y+r.height-10f, r.x+10f, r.y+r.height/2f)
+        sr.color = Color(0.55f,0.25f,0.06f,0.88f); sr.rect(r.x,r.y,r.width,r.height)
+        sr.color = Color(1f,0.82f,0.30f,1f)
+        if (right) sr.triangle(r.x+14f,r.y+10f, r.x+14f,r.y+r.height-10f, r.x+r.width-10f,r.y+r.height/2f)
+        else       sr.triangle(r.x+r.width-14f,r.y+10f, r.x+r.width-14f,r.y+r.height-10f, r.x+10f,r.y+r.height/2f)
+    }
+
+    private fun drawSwatches(sr: ShapeRenderer, colors: List<Color>, startX: Float, y: Float) {
+        for (i in colors.indices) {
+            val sx = startX + i * 82f
+            if ((if (colors === bodyColors) selBody else selShoe) == i) {
+                sr.color = Color(1f,0.88f,0.26f,1f); sr.rect(sx-4f,y-4f,52f,52f)
+            }
+            sr.color = colors[i]; sr.rect(sx,y,44f,44f)
+        }
     }
 
     private fun drawPlayBtn(sr: ShapeRenderer) {
-        val pulse = MathUtils.sin(anim*2.6f)*0.05f+0.95f
-        // Glow
-        sr.color = Color(1f,0.60f,0.04f,0.18f)
-        sr.rect(playBtn.x-10f, playBtn.y-10f, playBtn.width+20f, playBtn.height+20f)
-        // Body
-        sr.color = Color(0.88f*pulse,0.40f*pulse,0.04f,1f)
-        sr.rect(playBtn.x, playBtn.y, playBtn.width, playBtn.height)
-        // Top shine
-        sr.color = Color(1f,0.76f,0.24f,0.50f)
-        sr.rect(playBtn.x, playBtn.y+playBtn.height-14f, playBtn.width, 14f)
-        // Bottom shadow
-        sr.color = Color(0.38f,0.14f,0.01f,0.60f)
-        sr.rect(playBtn.x, playBtn.y, playBtn.width, 12f)
-    }
-
-    private fun drawLogo(bat: com.badlogic.gdx.graphics.g2d.SpriteBatch) {
-        // Draw the generated logo PNG
-        val lw = 1024f * 0.85f
-        val lh = 256f  * 0.85f
-        bat.draw(Assets.logo, VW/2f - lw/2f, VH - lh - 30f, lw, lh)
+        val p = MathUtils.sin(anim*2.5f)*0.04f+0.96f
+        sr.color = Color(1f,0.55f,0.04f,0.20f)
+        sr.rect(playBtn.x-10f,playBtn.y-10f,playBtn.width+20f,playBtn.height+20f)
+        sr.color = Color(0.88f*p,0.40f*p,0.04f,1f)
+        sr.rect(playBtn.x,playBtn.y,playBtn.width,playBtn.height)
+        sr.color = Color(1f,0.75f,0.24f,0.50f)
+        sr.rect(playBtn.x,playBtn.y+playBtn.height-14f,playBtn.width,14f)
     }
 
     private fun drawText(bat: com.badlogic.gdx.graphics.g2d.SpriteBatch) {
-        // Tagline
-        font.data.setScale(2.2f)
-        font.color = Color(1f,0.76f,0.26f,0.85f)
-        font.draw(bat, "Run. Jump. Slide. Survive.", 570f, VH-220f)
-
-        // Customize header
-        font.data.setScale(2.6f)
-        font.color = Color(1f,0.85f,0.38f,1f)
-        font.draw(bat, "CUSTOMIZE", 830f, 680f)
-
-        // Hat row
-        font.data.setScale(2.1f)
-        font.color = Color(1f,0.78f,0.36f,0.92f)
-        font.draw(bat, "HAT", 700f, 580f)
-        font.color = Color.WHITE
-        font.draw(bat, hatTypes[selHat].name, 850f, 580f)
-
-        // Color row label
-        font.color = Color(1f,0.78f,0.36f,0.92f)
-        font.draw(bat, "COLOR", 700f, 465f)
-
-        // Play button label
-        font.data.setScale(3.6f)
-        font.color = Color(0.10f,0.04f,0.01f,1f)
+        font.data.setScale(2.2f); font.color = Color(1f,0.85f,0.38f,1f)
+        font.draw(bat,"CUSTOMIZE",830f,650f)
+        font.data.setScale(2.0f); font.color = Color(1f,0.80f,0.36f,0.92f)
+        font.draw(bat,"HAT",  700f,572f); font.color = Color.WHITE
+        font.draw(bat,hatTypes[selHat].name,850f,572f)
+        font.color = Color(1f,0.80f,0.36f,0.92f)
+        font.draw(bat,"BODY", 700f,460f)
+        font.draw(bat,"SHOES",700f,348f)
+        font.data.setScale(3.4f); font.color = Color(0.10f,0.04f,0.01f,1f)
         layout.setText(font,"PLAY")
-        font.draw(bat,"PLAY", VW/2f-layout.width/2f, 164f)
-
-        // Controls hint
-        font.data.setScale(1.7f)
-        font.color = Color(1f,1f,1f,0.32f)
-        font.draw(bat, "LEFT = SLIDE     RIGHT = JUMP", 600f, 44f)
+        font.draw(bat,"PLAY",VW/2f-layout.width/2f,158f)
+        font.data.setScale(1.6f); font.color = Color(1f,1f,1f,0.30f)
+        font.draw(bat,"TAP ANYWHERE TO JUMP",700f,44f)
     }
 
     override fun resize(width: Int, height: Int) {
-        camera.setToOrtho(false, VW, VH)
-        camera.position.set(VW/2f, VH/2f, 0f)
-        camera.update()
+        camera.setToOrtho(false,VW,VH); camera.position.set(VW/2f,VH/2f,0f); camera.update()
     }
-
     override fun show()    {}
     override fun pause()   {}
     override fun resume()  {}
