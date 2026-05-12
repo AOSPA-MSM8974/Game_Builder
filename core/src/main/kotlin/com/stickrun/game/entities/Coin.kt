@@ -2,55 +2,43 @@ package com.stickrun.game.entities
 
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import com.badlogic.gdx.math.Circle
-import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.math.Rectangle
 
-class Coin(x: Float, y: Float) {
-    val position = Vector2(x, y)
-    val bounds = Circle(x + RADIUS, y + RADIUS, RADIUS)
-    var collected = false
-    var animTimer = 0f
-    var collectAnim = 0f // 0 = not collected, > 0 = collecting
+class Coin(var cx: Float, var cy: Float) {
 
-    companion object {
-        const val RADIUS = 10f
-    }
+    var collected    = false
+    var collectTimer = 0f
+    private var bobTimer = 0f
+
+    val bounds = Rectangle(cx - R, cy - R, R * 2f, R * 2f)
+
+    companion object { const val R = 18f }
 
     fun update(delta: Float) {
-        animTimer += delta
-        if (collectAnim > 0f) {
-            collectAnim += delta * 3f
-        }
+        bobTimer += delta
+        if (collected) collectTimer += delta * 3f
+        cy = (cy - R) + R + Math.sin(bobTimer * 3.2).toFloat() * 5f  // gentle bob
+        bounds.setCenter(cx, cy)
     }
 
-    fun collect() {
-        if (!collected) {
-            collected = true
-            collectAnim = 0.01f
-        }
-    }
-
-    fun isFinished() = collected && collectAnim > 1f
+    val done get() = collected && collectTimer >= 1f
 
     fun draw(sr: ShapeRenderer) {
-        if (collected && collectAnim <= 0f) return
+        if (done) return
+        val alpha = if (collected) (1f - collectTimer).coerceAtLeast(0f) else 1f
+        val scale = if (collected) 1f + collectTimer * 0.7f else 1f
+        val r     = R * scale
 
-        val alpha = if (collected) (1f - collectAnim).coerceAtLeast(0f) else 1f
-        val scale = if (collected) 1f + collectAnim * 0.5f else 1f + Math.sin((animTimer * 4.0)).toFloat() * 0.08f
-        val r = RADIUS * scale
+        // Glow
+        sr.color = Color(1f, 0.85f, 0.10f, alpha * 0.22f)
+        sr.circle(cx, cy, r + 10f, 14)
 
-        val bobY = position.y + Math.sin((animTimer * 3.0)).toFloat() * 3f
-
-        // Outer glow
-        sr.color = Color(1f, 0.85f, 0.1f, alpha * 0.3f)
-        sr.circle(position.x + RADIUS, bobY + RADIUS, r + 5f, 16)
-
-        // Main coin
-        sr.color = Color(1f, 0.82f, 0f, alpha)
-        sr.circle(position.x + RADIUS, bobY + RADIUS, r, 16)
+        // Body
+        sr.color = Color(1f, 0.80f, 0.00f, alpha)
+        sr.circle(cx, cy, r, 16)
 
         // Shine
-        sr.color = Color(1f, 1f, 0.7f, alpha * 0.6f)
-        sr.circle(position.x + RADIUS - r * 0.2f, bobY + RADIUS + r * 0.2f, r * 0.35f, 10)
+        sr.color = Color(1f, 1f, 0.70f, alpha * 0.55f)
+        sr.circle(cx - r * 0.22f, cy + r * 0.22f, r * 0.30f, 8)
     }
 }

@@ -7,17 +7,17 @@ import com.stickrun.game.screens.MenuScreen
 
 class StickRunGame : Game() {
     lateinit var batch: SpriteBatch
-    lateinit var shapeRenderer: ShapeRenderer
+    lateinit var shape: ShapeRenderer
 
     override fun create() {
         batch = SpriteBatch()
-        shapeRenderer = ShapeRenderer()
+        shape = ShapeRenderer()
         setScreen(MenuScreen(this))
     }
 
     override fun dispose() {
         batch.dispose()
-        shapeRenderer.dispose()
+        shape.dispose()
         screen?.dispose()
     }
 }

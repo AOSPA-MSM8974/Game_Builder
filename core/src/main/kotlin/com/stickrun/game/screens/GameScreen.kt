@@ -11,219 +11,477 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
-import com.badlogic.gdx.math.Vector2
 import com.stickrun.game.StickRunGame
 import com.stickrun.game.entities.Coin
-import com.stickrun.game.entities.Platform
+import com.stickrun.game.entities.Obstacle
 import com.stickrun.game.entities.Player
 import com.stickrun.game.world.WorldGenerator
 
 class GameScreen(private val game: StickRunGame) : Screen {
 
-    private val camera = OrthographicCamera()
-    private val uiCamera = OrthographicCamera()
-    val player = Player(100f, 200f)
-    private val generator = WorldGenerator()
-    private val platforms: MutableList<Platform>
-    private val coins: MutableList<Coin>
-    private var score = 0
-    private var coinCount = 0
-    private val font = BitmapFont()
-    private val layout = GlyphLayout()
-    private val leftBtnBounds = Rectangle()
-    private val rightBtnBounds = Rectangle()
-    private val jumpBtnBounds = Rectangle()
-    private val bgClouds = mutableListOf<Vector2>()
-    private val bgTrees = mutableListOf<Vector2>()
-    private val bgSils = mutableListOf<Vector2>()
-    private var lastChunkEnd = 5000f
-    private val deathY = -200f
-    private var gameOver = false
-    private var gameOverTimer = 0f
-    private data class FloatText(val text: String, var x: Float, var y: Float, var life: Float)
+    // ── Virtual resolution ─────────────────────────────────────────────────
+    companion object {
+        const val VW = 1920f
+        const val VH = 1080f
+    }
+
+    private val worldCam = OrthographicCamera(VW, VH)
+    private val uiCam    = OrthographicCamera(VW, VH)
+
+    // ── Entities ───────────────────────────────────────────────────────────
+    val player     = Player(200f, Player.GROUND_Y)
+    private val gen      = WorldGenerator()
+    private val obstacles = mutableListOf<Obstacle>()
+    private val coins     = mutableListOf<Coin>()
+
+    // ── State ──────────────────────────────────────────────────────────────
+    private var score       = 0
+    private var coinCount   = 0
+    private var distance    = 0f
+    private var runSpeed    = 480f          // pixels/sec, increases over time
+    private var difficulty  = 0f
+    private var gameOver    = false
+    private var goTimer     = 0f            // game-over animation timer
+    private var nextChunkX  = 0f
+
+    // Floating texts
+    private data class FloatText(var x: Float, var y: Float, var life: Float, val msg: String)
     private val floatTexts = mutableListOf<FloatText>()
+
+    // Touch zones (screen coords, updated in handleInput)
+    private val jumpZone  = Rectangle()
+    private val slideZone = Rectangle()
+
+    // Background parallax layers
+    private data class BgRect(val wx: Float, val wy: Float, val w: Float, val h: Float)
+    private val bgBuildings = ArrayList<BgRect>(40)
+    private val bgTrees     = ArrayList<BgRect>(50)
+    private val bgClouds    = ArrayList<BgRect>(30)
+
+    // Reusable collision rect (avoids allocation per frame)
+    private val colRect = Rectangle()
+
+    private val font   = BitmapFont()
+    private val layout = GlyphLayout()
 
     fun applyCustomization(bodyColor: Color, hatType: Player.HatType, hatColor: Color) {
         player.bodyColor = bodyColor
-        player.hatType = hatType
-        player.hatColor = hatColor
+        player.hatType   = hatType
+        player.hatColor  = hatColor
     }
 
     init {
-        camera.setToOrtho(false, 480f, 270f)
-        uiCamera.setToOrtho(false, 480f, 270f)
-        val (plats, coinList) = generator.generateLevel()
-        platforms = plats.toMutableList()
-        coins = coinList.toMutableList()
-        for (i in 0..30) {
-            bgClouds.add(Vector2(i * 160f + MathUtils.random(0f, 80f), 190f + MathUtils.random(-20f, 30f)))
-            if (i % 2 == 0) bgTrees.add(Vector2(i * 220f + MathUtils.random(0f, 100f), 58f))
-            bgSils.add(Vector2(i * 300f + MathUtils.random(0f, 150f), 60f + MathUtils.random(0f, 60f)))
+        worldCam.position.set(VW / 2f, VH / 2f, 0f)
+        uiCam.position.set(VW / 2f, VH / 2f, 0f)
+        worldCam.update(); uiCam.update()
+
+        font.data.setScale(2.2f)
+
+        // Seed background
+        for (i in 0..50) {
+            bgBuildings.add(BgRect(i * 380f + MathUtils.random(0f, 190f), Player.GROUND_Y,
+                MathUtils.random(55f, 130f), MathUtils.random(80f, 230f)))
+            bgTrees.add(BgRect(i * 260f + MathUtils.random(0f, 130f), Player.GROUND_Y,
+                22f, MathUtils.random(55f, 100f)))
+            if (i < 30) bgClouds.add(BgRect(i * 440f + MathUtils.random(0f, 220f),
+                MathUtils.random(680f, 920f), MathUtils.random(60f, 120f), 0f))
         }
-        font.data.setScale(1.2f)
+
+        spawnChunk(300f)
+        spawnChunk(nextChunkX)
     }
+
+    // ── Chunk Spawning ─────────────────────────────────────────────────────
+
+    private fun spawnChunk(startX: Float) {
+        val (obs, cns) = gen.generateChunk(startX, difficulty)
+        obstacles.addAll(obs)
+        coins.addAll(cns)
+        nextChunkX = startX + 6000f
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────────
 
     override fun render(delta: Float) {
-        val dt = delta.coerceAtMost(0.05f)
-        handleInput()
-        if (!gameOver) update(dt)
+        // Cap delta to avoid physics explosion on lag spikes
+        val dt = delta.coerceIn(0f, 0.033f)
+
+        handleInput(dt)
+        if (!gameOver) update(dt) else goTimer += dt
+
+        // Return to menu after game over
+        if (gameOver && goTimer > 1.5f &&
+            (Gdx.input.justTouched() || Gdx.input.isKeyJustPressed(Input.Keys.ANY_KEY))) {
+            game.setScreen(MenuScreen(game))
+            return
+        }
+
         draw()
-        if (gameOver) {
-            gameOverTimer += dt
-            if (gameOverTimer > 2f && (Gdx.input.isKeyJustPressed(Input.Keys.ANY_KEY) || Gdx.input.justTouched())) {
-                game.setScreen(MenuScreen(game))
-            }
+    }
+
+    // ── Input ──────────────────────────────────────────────────────────────
+
+    private fun handleInput(dt: Float) {
+        val sw = Gdx.graphics.width.toFloat()
+        val sh = Gdx.graphics.height.toFloat()
+
+        // Left 40% = slide, right 60% = jump
+        slideZone.set(0f, 0f, sw * 0.40f, sh)
+        jumpZone.set(sw * 0.40f, 0f, sw * 0.60f, sh)
+
+        // Keyboard
+        if (Gdx.input.isKeyJustPressed(Input.Keys.UP)    ||
+            Gdx.input.isKeyJustPressed(Input.Keys.W)     ||
+            Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) player.jump()
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.DOWN)  ||
+            Gdx.input.isKeyJustPressed(Input.Keys.S))     player.slide()
+
+        // Touch
+        if (Gdx.input.justTouched()) {
+            val tx = Gdx.input.x.toFloat()
+            val ty = sh - Gdx.input.y.toFloat()
+            if (jumpZone.contains(tx, ty))  player.jump()
+            if (slideZone.contains(tx, ty)) player.slide()
         }
     }
 
-    private fun handleInput() {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) player.jump()
-        val sw = Gdx.graphics.width.toFloat(); val sh = Gdx.graphics.height.toFloat()
-        leftBtnBounds.set(0f, 0f, sw * 0.25f, sh * 0.4f)
-        rightBtnBounds.set(sw * 0.25f, 0f, sw * 0.25f, sh * 0.4f)
-        jumpBtnBounds.set(sw * 0.65f, 0f, sw * 0.35f, sh * 0.4f)
-        for (i in 0 until 5) {
-            if (!Gdx.input.isTouched(i)) continue
-            val tx = Gdx.input.getX(i).toFloat(); val ty = sh - Gdx.input.getY(i).toFloat()
-            if (leftBtnBounds.contains(tx, ty)) { player.velocity.x = -Player.MOVE_SPEED; player.facingRight = false; player.isRunning = true }
-            if (rightBtnBounds.contains(tx, ty)) { player.velocity.x = Player.MOVE_SPEED; player.facingRight = true; player.isRunning = true }
-            if (jumpBtnBounds.contains(tx, ty) && Gdx.input.justTouched()) player.jump()
-        }
-    }
+    // ── Update ─────────────────────────────────────────────────────────────
 
-    private fun update(delta: Float) {
-        player.update(delta)
-        for (plat in platforms) {
-            val pb = plat.bounds
-            if (!pb.overlaps(player.bounds)) continue
-            val platTop = pb.y + pb.height
-            when {
-                player.velocity.y <= 0f && player.position.y <= platTop + 8f && player.position.y >= pb.y + pb.height - 8f -> {
-                    player.position.y = platTop; player.land()
-                }
-                player.velocity.y > 0f && player.position.y + Player.HEIGHT >= pb.y && player.position.y + Player.HEIGHT <= pb.y + 14f -> {
-                    player.velocity.y = 0f; player.position.y = pb.y - Player.HEIGHT
-                }
-                player.velocity.x > 0f && player.position.x + Player.WIDTH > pb.x && player.position.x < pb.x + 8f -> {
-                    player.position.x = pb.x - Player.WIDTH; player.velocity.x = 0f
-                }
-                player.velocity.x < 0f && player.position.x < pb.x + pb.width && player.position.x + Player.WIDTH > pb.x + pb.width - 8f -> {
-                    player.position.x = pb.x + pb.width; player.velocity.x = 0f
+    private fun update(dt: Float) {
+        // Gradually increase speed (caps at 1100)
+        runSpeed = (runSpeed + 12f * dt).coerceAtMost(1100f)
+        difficulty = ((player.x - 200f) / 28000f).coerceIn(0f, 1f)
+
+        player.update(dt, runSpeed)
+        distance = player.x - 200f
+
+        // ── Obstacle collision ────────────────────────────────────────────
+        // Use a slightly inset rect for fairness
+        colRect.set(
+            player.bounds.x + 6f,
+            player.bounds.y + 4f,
+            player.bounds.width  - 12f,
+            player.bounds.height - 6f
+        )
+        for (obs in obstacles) {
+            obs.update(dt)
+            if (obs.bounds.overlaps(colRect)) {
+                gameOver = true
+                player.alive = false
+                return
+            }
+        }
+
+        // ── Coin collection ───────────────────────────────────────────────
+        val pcx = player.bounds.x + player.bounds.width  / 2f
+        val pcy = player.bounds.y + player.bounds.height / 2f
+        val collectR = player.bounds.width * 0.6f + Coin.R
+
+        val ci = coins.iterator()
+        while (ci.hasNext()) {
+            val c = ci.next()
+            c.update(dt)
+            if (!c.collected) {
+                val dx = pcx - c.cx
+                val dy = pcy - c.cy
+                if (dx * dx + dy * dy < collectR * collectR) {
+                    c.collected = true
+                    coinCount++
+                    floatTexts.add(FloatText(c.cx, c.cy + 20f, 1.0f, "+10"))
                 }
             }
-            player.bounds.setPosition(player.position.x, player.position.y)
+            if (c.done) ci.remove()
         }
-        val iter = coins.iterator()
-        while (iter.hasNext()) {
-            val coin = iter.next()
-            coin.update(delta)
-            if (!coin.collected && Vector2(player.position.x + Player.WIDTH / 2f, player.position.y + Player.HEIGHT / 2f).dst(coin.position.x + Coin.RADIUS, coin.position.y + Coin.RADIUS) < Player.WIDTH * 0.65f + Coin.RADIUS) {
-                coin.collect(); coinCount++; floatTexts.add(FloatText("+10", coin.position.x, coin.position.y, 1f))
-            }
-            if (coin.isFinished()) iter.remove()
+
+        // ── Float texts ───────────────────────────────────────────────────
+        val fi = floatTexts.iterator()
+        while (fi.hasNext()) {
+            val ft = fi.next()
+            ft.y    += dt * 90f
+            ft.life -= dt * 1.4f
+            if (ft.life <= 0f) fi.remove()
         }
-        floatTexts.forEach { it.y += delta * 40f; it.life -= delta }
+
+        // ── Camera follow ─────────────────────────────────────────────────
+        val targetX = player.x + VW * 0.25f
+        worldCam.position.x = MathUtils.lerp(worldCam.position.x, targetX, 0.14f)
+        worldCam.position.y = VH / 2f
+        worldCam.update()
+
+        // ── Chunk spawning ────────────────────────────────────────────────
+        if (player.x + 3000f > nextChunkX) spawnChunk(nextChunkX)
+
+        // ── Cull off-screen objects ───────────────────────────────────────
+        val cullX = worldCam.position.x - VW
+        obstacles.removeAll { it.bounds.x + it.bounds.width < cullX }
+        coins.removeAll     { it.done || it.cx < cullX }
         floatTexts.removeAll { it.life <= 0f }
-        camera.position.x = MathUtils.lerp(camera.position.x, player.position.x - camera.viewportWidth * 0.35f + camera.viewportWidth / 2f, 0.1f)
-        camera.position.y = MathUtils.lerp(camera.position.y, camera.viewportHeight / 2f + 30f, 0.08f)
-        camera.update()
-        if (player.position.x > lastChunkEnd - 1200f) { val (np, nc) = generator.generateChunk(lastChunkEnd); platforms.addAll(np); coins.addAll(nc); lastChunkEnd += 800f }
-        val camLeft = camera.position.x - camera.viewportWidth / 2f
-        platforms.removeAll { it.bounds.x + it.bounds.width < camLeft - camera.viewportWidth }
-        if (player.position.y < deathY) gameOver = true
-        score = (player.position.x / 10f).toInt() + coinCount * 10
+
+        score = (distance / 6f).toInt() + coinCount * 10
     }
+
+    // ── Draw ───────────────────────────────────────────────────────────────
 
     private fun draw() {
-        val camLeft = camera.position.x - camera.viewportWidth / 2f
-        Gdx.gl.glClearColor(0.95f, 0.55f, 0.1f, 1f)
+        Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
         Gdx.gl.glEnable(GL20.GL_BLEND)
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
 
-        game.shapeRenderer.projectionMatrix = camera.combined
-        game.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
+        val sr     = game.shape
+        val bat    = game.batch
+        val camL   = worldCam.position.x - VW / 2f
 
-        // Sky layers
-        game.shapeRenderer.color = Color(0.98f, 0.45f, 0.04f, 1f); game.shapeRenderer.rect(camLeft-5f, 0f, camera.viewportWidth+10f, 100f)
-        game.shapeRenderer.color = Color(0.96f, 0.56f, 0.10f, 1f); game.shapeRenderer.rect(camLeft-5f, 100f, camera.viewportWidth+10f, 100f)
-        game.shapeRenderer.color = Color(0.88f, 0.66f, 0.22f, 1f); game.shapeRenderer.rect(camLeft-5f, 200f, camera.viewportWidth+10f, 100f)
+        // ── World ──────────────────────────────────────────────────────────
+        sr.projectionMatrix = worldCam.combined
+        sr.begin(ShapeRenderer.ShapeType.Filled)
 
-        // Sun
-        val sunX = camLeft + camera.viewportWidth * 0.82f; val sunY = 230f
-        game.shapeRenderer.color = Color(1f, 0.9f, 0.3f, 0.1f); game.shapeRenderer.circle(sunX, sunY, 55f, 20)
-        game.shapeRenderer.color = Color(1f, 0.92f, 0.4f, 0.9f); game.shapeRenderer.circle(sunX, sunY, 30f, 20)
-        game.shapeRenderer.color = Color(1f, 1f, 0.75f, 0.85f); game.shapeRenderer.circle(sunX, sunY, 18f, 16)
+        drawSky(sr, camL)
+        drawParallax(sr, camL)
+        drawGround(sr, camL)
 
-        // Background elements
-        for (b in bgSils) {
-            val bx = camLeft + ((b.x - camLeft * 0.12f + 10000f).mod(camera.viewportWidth + 500f))
-            game.shapeRenderer.color = Color(0.68f, 0.28f, 0.04f, 0.2f)
-            game.shapeRenderer.rect(bx, 60f, 35f + b.y*1.4f, b.y + 55f)
+        for (obs in obstacles) {
+            if (obs.bounds.x > camL + VW + 100f || obs.bounds.x + obs.bounds.width < camL - 100f) continue
+            obs.draw(sr)
         }
-        for (t in bgTrees) {
-            val tx = camLeft + ((t.x - camLeft*0.28f + 10000f).mod(camera.viewportWidth + 500f))
-            game.shapeRenderer.color = Color(0.42f, 0.16f, 0.03f, 0.55f)
-            game.shapeRenderer.rect(tx+7f, 60f, 7f, 30f)
-            game.shapeRenderer.color = Color(0.32f, 0.12f, 0.02f, 0.65f)
-            game.shapeRenderer.circle(tx+10f, 96f, 20f, 12)
-        }
-        for (c in bgClouds) {
-            val cx = camLeft + ((c.x - camLeft*0.18f + 10000f).mod(camera.viewportWidth + 600f))
-            game.shapeRenderer.color = Color(1f, 0.75f, 0.35f, 0.42f)
-            game.shapeRenderer.circle(cx, c.y, 18f, 12); game.shapeRenderer.circle(cx+22f, c.y-5f, 13f, 10); game.shapeRenderer.circle(cx-16f, c.y-7f, 11f, 10)
+        for (coin in coins) {
+            if (coin.cx > camL + VW + 60f || coin.cx < camL - 60f) continue
+            coin.draw(sr)
         }
 
-        // Ground
-        game.shapeRenderer.color = Color(0.28f, 0.11f, 0.02f, 1f); game.shapeRenderer.rect(camLeft-10f, 0f, camera.viewportWidth+20f, 62f)
-        game.shapeRenderer.color = Color(0.40f, 0.17f, 0.05f, 1f); game.shapeRenderer.rect(camLeft-10f, 57f, camera.viewportWidth+20f, 7f)
+        player.draw(sr)
 
-        for (p in platforms) { if (p.bounds.x > camLeft+camera.viewportWidth+60f || p.bounds.x+p.bounds.width < camLeft-60f) continue; p.draw(game.shapeRenderer) }
-        for (c in coins) { if (c.position.x > camLeft+camera.viewportWidth+30f || c.position.x < camLeft-30f) continue; c.draw(game.shapeRenderer) }
-        player.draw(game.shapeRenderer)
-        game.shapeRenderer.end()
+        sr.end()
 
-        // UI overlay
-        game.shapeRenderer.projectionMatrix = uiCamera.combined
-        game.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
-        val a = 0.28f
-        game.shapeRenderer.color = Color(1f, 1f, 1f, a)
-        game.shapeRenderer.triangle(480f*0.05f, 270f*0.08f, 480f*0.05f, 270f*0.24f, 480f*0.14f, 270f*0.16f)
-        game.shapeRenderer.triangle(480f*0.30f, 270f*0.08f, 480f*0.30f, 270f*0.24f, 480f*0.21f, 270f*0.16f)
-        game.shapeRenderer.color = Color(1f, 0.85f, 0.1f, a)
-        game.shapeRenderer.circle(480f*0.87f, 270f*0.16f, 26f, 16)
-        // Jump label
-        game.shapeRenderer.end()
-
-        game.batch.projectionMatrix = camera.combined
-        game.batch.begin()
-        font.data.setScale(0.85f); font.color = Color(1f, 0.95f, 0.3f, 1f)
-        for (ft in floatTexts) { font.color.a = ft.life.coerceAtLeast(0f); font.draw(game.batch, ft.text, ft.x, ft.y+20f) }
-        game.batch.end()
-
-        game.batch.projectionMatrix = uiCamera.combined
-        game.batch.begin()
-        font.data.setScale(1.15f); font.color = Color.WHITE
-        font.draw(game.batch, "SCORE: $score", 10f, 262f)
-        font.draw(game.batch, "COINS: $coinCount", 10f, 244f)
-        font.data.setScale(0.9f); font.color = Color(1f, 0.9f, 0.5f, 0.65f)
-        font.draw(game.batch, "JUMP", 480f*0.83f, 270f*0.08f)
-        if (gameOver) {
-            font.data.setScale(2.5f); font.color = Color(1f, 0.25f, 0.05f, 1f)
-            layout.setText(font, "GAME OVER")
-            font.draw(game.batch, "GAME OVER", 240f - layout.width/2f, 175f)
-            font.data.setScale(1.2f); font.color = Color.WHITE
-            layout.setText(font, "Score: $score   Coins: $coinCount")
-            font.draw(game.batch, "Score: $score   Coins: $coinCount", 240f - layout.width/2f, 145f)
-            if (gameOverTimer > 2f) { font.color = Color(1f, 0.88f, 0.4f, 1f); layout.setText(font, "Tap to return to menu"); font.draw(game.batch, "Tap to return to menu", 240f - layout.width/2f, 115f) }
+        // ── Floating texts (world space) ───────────────────────────────────
+        bat.projectionMatrix = worldCam.combined
+        bat.begin()
+        font.data.setScale(1.9f)
+        for (ft in floatTexts) {
+            font.color = Color(1f, 0.95f, 0.25f, ft.life.coerceIn(0f, 1f))
+            font.draw(bat, ft.msg, ft.x, ft.y)
         }
-        game.batch.end()
+        bat.end()
+
+        // ── UI ─────────────────────────────────────────────────────────────
+        sr.projectionMatrix = uiCam.combined
+        sr.begin(ShapeRenderer.ShapeType.Filled)
+        drawHUDBackground(sr)
+        drawControls(sr)
+        if (gameOver) drawGameOverOverlay(sr)
+        sr.end()
+
+        bat.projectionMatrix = uiCam.combined
+        bat.begin()
+        drawHUDText(bat)
+        if (gameOver) drawGameOverText(bat)
+        bat.end()
     }
 
-    override fun resize(width: Int, height: Int) { camera.setToOrtho(false, 480f, 270f); uiCamera.setToOrtho(false, 480f, 270f) }
-    override fun show() {}
-    override fun pause() {}
-    override fun resume() {}
-    override fun hide() {}
+    // ── Sky ────────────────────────────────────────────────────────────────
+
+    private fun drawSky(sr: ShapeRenderer, camL: Float) {
+        val w = VW + 4f
+
+        // Bottom band — deep burnt orange
+        sr.color = Color(0.94f, 0.40f, 0.03f, 1f)
+        sr.rect(camL - 2f, 0f, w, VH * 0.32f)
+
+        // Mid — warm orange
+        sr.color = Color(0.96f, 0.54f, 0.08f, 1f)
+        sr.rect(camL - 2f, VH * 0.32f, w, VH * 0.34f)
+
+        // Upper — golden amber
+        sr.color = Color(0.90f, 0.66f, 0.18f, 1f)
+        sr.rect(camL - 2f, VH * 0.66f, w, VH * 0.20f)
+
+        // Top — pale yellow horizon
+        sr.color = Color(0.97f, 0.82f, 0.38f, 1f)
+        sr.rect(camL - 2f, VH * 0.86f, w, VH * 0.14f)
+
+        // Sun — fixed at top-right of viewport
+        val sx = camL + VW * 0.83f
+        val sy = VH  * 0.88f
+        sr.color = Color(1f, 0.88f, 0.28f, 0.09f); sr.circle(sx, sy, 130f, 24)
+        sr.color = Color(1f, 0.90f, 0.32f, 0.16f); sr.circle(sx, sy, 100f, 24)
+        sr.color = Color(1f, 0.92f, 0.40f, 0.88f); sr.circle(sx, sy,  68f, 24)
+        sr.color = Color(1f, 1.00f, 0.72f, 0.84f); sr.circle(sx, sy,  40f, 18)
+    }
+
+    // ── Parallax ───────────────────────────────────────────────────────────
+
+    private fun drawParallax(sr: ShapeRenderer, camL: Float) {
+        val wrap = VW + 1200f
+
+        // Far buildings (0.08x scroll)
+        for (b in bgBuildings) {
+            val bx = camL + ((b.wx - camL * 0.08f + 999999f) % wrap)
+            sr.color = Color(0.62f, 0.25f, 0.04f, 0.18f)
+            sr.rect(bx, Player.GROUND_Y, b.w, b.h)
+            sr.color = Color(0.70f, 0.30f, 0.05f, 0.10f)
+            sr.rect(bx, Player.GROUND_Y + b.h - 6f, b.w, 6f) // roof
+        }
+
+        // Trees (0.28x scroll)
+        for (t in bgTrees) {
+            val tx = camL + ((t.wx - camL * 0.28f + 999999f) % wrap)
+            sr.color = Color(0.38f, 0.14f, 0.02f, 0.55f)
+            sr.rect(tx + 6f, Player.GROUND_Y, 10f, t.h * 0.65f)
+            sr.color = Color(0.28f, 0.10f, 0.02f, 0.65f)
+            sr.circle(tx + 11f, Player.GROUND_Y + t.h * 0.65f + 26f, 32f, 12)
+        }
+
+        // Clouds (0.12x scroll)
+        for (c in bgClouds) {
+            val cx = camL + ((c.wx - camL * 0.12f + 999999f) % wrap)
+            sr.color = Color(1f, 0.74f, 0.32f, 0.32f)
+            sr.circle(cx,        c.wy,       c.w,        12)
+            sr.circle(cx + c.w * 0.9f, c.wy - 10f, c.w * 0.70f, 10)
+            sr.circle(cx - c.w * 0.7f, c.wy - 12f, c.w * 0.58f, 10)
+        }
+    }
+
+    // ── Ground ─────────────────────────────────────────────────────────────
+
+    private fun drawGround(sr: ShapeRenderer, camL: Float) {
+        val w = VW + 4f
+
+        // Deep soil
+        sr.color = Color(0.18f, 0.07f, 0.01f, 1f)
+        sr.rect(camL - 2f, 0f, w, Player.GROUND_Y)
+
+        // Surface band
+        sr.color = Color(0.34f, 0.14f, 0.03f, 1f)
+        sr.rect(camL - 2f, Player.GROUND_Y - 8f, w, 14f)
+
+        // Top crust highlight
+        sr.color = Color(0.50f, 0.22f, 0.06f, 1f)
+        sr.rect(camL - 2f, Player.GROUND_Y + 4f, w, 5f)
+
+        // Subtle ground grid lines every 128px
+        sr.color = Color(0.28f, 0.11f, 0.02f, 0.35f)
+        val startX = camL - (camL % 128f)
+        var gx = startX
+        while (gx < camL + VW + 128f) {
+            sr.rect(gx, Player.GROUND_Y - 8f, 2f, 12f)
+            gx += 128f
+        }
+    }
+
+    // ── HUD ────────────────────────────────────────────────────────────────
+
+    private fun drawHUDBackground(sr: ShapeRenderer) {
+        // Top bar
+        sr.color = Color(0f, 0f, 0f, 0.42f)
+        sr.rect(0f, VH - 88f, VW, 88f)
+        // Accent line
+        sr.color = Color(1f, 0.80f, 0.20f, 0.60f)
+        sr.rect(0f, VH - 90f, VW, 3f)
+    }
+
+    private fun drawControls(sr: ShapeRenderer) {
+        // Slide button — bottom left
+        sr.color = Color(1f, 1f, 1f, 0.10f)
+        sr.rect(0f, 0f, VW * 0.40f, VH * 0.22f)
+        // Jump button — bottom right
+        sr.color = Color(1f, 0.85f, 0.10f, 0.10f)
+        sr.rect(VW * 0.40f, 0f, VW * 0.60f, VH * 0.22f)
+
+        // Slide icon — down arrow
+        sr.color = Color(1f, 1f, 1f, 0.32f)
+        sr.triangle(
+            VW * 0.10f - 28f, VH * 0.14f,
+            VW * 0.10f + 28f, VH * 0.14f,
+            VW * 0.10f,       VH * 0.04f
+        )
+        // Jump icon — up arrow
+        sr.color = Color(1f, 0.92f, 0.28f, 0.38f)
+        sr.triangle(
+            VW * 0.72f - 28f, VH * 0.04f,
+            VW * 0.72f + 28f, VH * 0.04f,
+            VW * 0.72f,       VH * 0.16f
+        )
+    }
+
+    private fun drawHUDText(bat: com.badlogic.gdx.graphics.g2d.SpriteBatch) {
+        font.data.setScale(2.4f)
+        font.color = Color(1f, 0.90f, 0.28f, 1f)
+        font.draw(bat, "SCORE  $score", 30f, VH - 28f)
+
+        font.data.setScale(2.0f)
+        font.color = Color(1f, 1f, 1f, 0.88f)
+        font.draw(bat, "COINS  $coinCount", 30f, VH - 64f)
+
+        // Speed indicator
+        val speedPct = ((runSpeed - 480f) / (1100f - 480f)).coerceIn(0f, 1f)
+        font.data.setScale(1.6f)
+        font.color = Color(MathUtils.lerp(0.6f, 1f, speedPct), MathUtils.lerp(0.9f, 0.4f, speedPct), 0.2f, 0.75f)
+        font.draw(bat, "SPEED  ${runSpeed.toInt()}", VW - 380f, VH - 28f)
+
+        // Control hints
+        font.data.setScale(1.5f)
+        font.color = Color(1f, 1f, 1f, 0.28f)
+        font.draw(bat, "SLIDE", VW * 0.05f, VH * 0.20f)
+        font.draw(bat, "JUMP",  VW * 0.66f, VH * 0.20f)
+    }
+
+    // ── Game Over ──────────────────────────────────────────────────────────
+
+    private fun drawGameOverOverlay(sr: ShapeRenderer) {
+        val a = (goTimer * 1.8f).coerceAtMost(0.68f)
+        sr.color = Color(0f, 0f, 0f, a)
+        sr.rect(0f, 0f, VW, VH)
+
+        // Panel
+        if (goTimer > 0.4f) {
+            val pa = ((goTimer - 0.4f) * 2.5f).coerceAtMost(1f)
+            sr.color = Color(0.14f, 0.06f, 0.01f, pa * 0.88f)
+            sr.rect(VW * 0.25f, VH * 0.30f, VW * 0.50f, VH * 0.40f)
+            sr.color = Color(1f, 0.55f, 0.05f, pa * 0.70f)
+            sr.rect(VW * 0.25f, VH * 0.68f, VW * 0.50f, 4f)
+            sr.rect(VW * 0.25f, VH * 0.30f, VW * 0.50f, 4f)
+        }
+    }
+
+    private fun drawGameOverText(bat: com.badlogic.gdx.graphics.g2d.SpriteBatch) {
+        if (goTimer < 0.3f) return
+        val a = ((goTimer - 0.3f) * 2.5f).coerceAtMost(1f)
+
+        font.data.setScale(5.0f)
+        font.color = Color(1f, 0.22f, 0.04f, a)
+        layout.setText(font, "GAME OVER")
+        font.draw(bat, "GAME OVER", VW / 2f - layout.width / 2f, VH * 0.72f)
+
+        font.data.setScale(2.6f)
+        font.color = Color(1f, 1f, 1f, a)
+        val s = "Score: $score    Coins: $coinCount"
+        layout.setText(font, s)
+        font.draw(bat, s, VW / 2f - layout.width / 2f, VH * 0.56f)
+
+        if (goTimer > 1.5f) {
+            val blink = MathUtils.sin(goTimer * 5f) * 0.45f + 0.55f
+            font.data.setScale(2.0f)
+            font.color = Color(1f, 0.88f, 0.35f, blink)
+            val tap = "Tap anywhere to play again"
+            layout.setText(font, tap)
+            font.draw(bat, tap, VW / 2f - layout.width / 2f, VH * 0.40f)
+        }
+    }
+
+    // ── Screen lifecycle ───────────────────────────────────────────────────
+
+    override fun resize(width: Int, height: Int) {
+        worldCam.setToOrtho(false, VW, VH)
+        uiCam.setToOrtho(false, VW, VH)
+        worldCam.position.set(VW / 2f, VH / 2f, 0f)
+        uiCam.position.set(VW / 2f, VH / 2f, 0f)
+        worldCam.update(); uiCam.update()
+    }
+
+    override fun show()    {}
+    override fun pause()   {}
+    override fun resume()  {}
+    override fun hide()    {}
     override fun dispose() { font.dispose() }
 }
