@@ -7,42 +7,52 @@ import com.badlogic.gdx.math.Rectangle
 
 class Player(startX: Float, startY: Float) {
 
-    var x = startX
-    var y = startY
-    var velY = 0f
+    // Position & physics
+    var x        = startX
+    var y        = startY
+    var velY     = 0f
     var onGround = false
-    var sliding = false
-    var jumpCount = 0
-    var animTimer = 0f
-    var alive = true
+    var alive    = true
 
+    // State
+    var jumping      = false
+    var sliding      = false
+    var jumpCount    = 0
+    var animTimer    = 0f
     private var slideTimer = 0f
-    private var legAngle = 0f
+    private var legAngle   = 0f
+    private var deathTimer = 0f
 
     // Cosmetics
-    var bodyColor: Color = Color(0.08f, 0.08f, 0.08f, 1f)
-    var hatType: HatType = HatType.NONE
-    var hatColor: Color = Color(0.8f, 0.15f, 0.15f, 1f)
+    var bodyColor = Color(0.08f, 0.08f, 0.08f, 1f)
+    var hatType   = HatType.NONE
+    var hatColor  = Color(0.75f, 0.12f, 0.12f, 1f)
 
     val bounds = Rectangle(startX, startY, W, H)
 
     companion object {
-        const val W           = 48f
-        const val H           = 96f
-        const val SLIDE_W     = 80f
-        const val SLIDE_H     = 48f
-        const val GROUND_Y    = 130f
-        const val JUMP_VEL    = 1100f
-        const val GRAVITY     = -2600f
-        const val MAX_FALL    = -1900f
-        const val MAX_JUMPS   = 2
-        const val SLIDE_TIME  = 0.55f
+        const val W          = 44f
+        const val H          = 88f
+        const val SLIDE_W    = 72f
+        const val SLIDE_H    = 44f
+        const val GROUND_Y   = 140f
+        const val JUMP_VEL   = 1050f
+        const val GRAVITY    = -2400f
+        const val MAX_FALL   = -1800f
+        const val MAX_JUMPS  = 2
+        const val SLIDE_DUR  = 0.5f
     }
 
     enum class HatType { NONE, CAP, TOP_HAT, BEANIE }
 
+    // ── Update ────────────────────────────────────────────────────────────
+
     fun update(delta: Float, speed: Float) {
+        if (!alive) { deathTimer += delta; return }
+
         animTimer += delta
+
+        // Horizontal auto-run
         x += speed * delta
 
         // Slide countdown
@@ -55,40 +65,42 @@ class Player(startX: Float, startY: Float) {
         velY = (velY + GRAVITY * delta).coerceAtLeast(MAX_FALL)
         y   += velY * delta
 
-        // Hard floor — cannot fall through
+        // Hard ground — cannot go below
         if (y <= GROUND_Y) {
-            y      = GROUND_Y
-            velY   = 0f
-            onGround = true
+            y         = GROUND_Y
+            velY      = 0f
+            onGround  = true
             jumpCount = 0
+            jumping   = false
         }
 
-        // Leg swing
+        // Animate legs
         legAngle = when {
-            sliding    -> 0f
-            onGround   -> MathUtils.sin(animTimer * 14f) * 34f
-            velY > 0f  -> -28f
-            else       -> 24f
+            sliding   -> 0f
+            onGround  -> MathUtils.sin(animTimer * 14f) * 34f
+            velY > 0f -> -30f
+            else      -> 26f
         }
 
-        // Reset for next frame; collision will flip it back if needed
+        // Reset each frame — platform collision sets it back
         onGround = false
         syncBounds()
     }
 
     fun jump() {
-        if (sliding || !alive) return
+        if (!alive || sliding) return
         if (jumpCount < MAX_JUMPS) {
-            velY = JUMP_VEL
+            velY      = JUMP_VEL
             jumpCount++
-            onGround = false
+            onGround  = false
+            jumping   = true
         }
     }
 
     fun slide() {
         if (!alive || !onGround || sliding) return
-        sliding   = true
-        slideTimer = SLIDE_TIME
+        sliding    = true
+        slideTimer = SLIDE_DUR
         syncBounds()
     }
 
@@ -98,6 +110,7 @@ class Player(startX: Float, startY: Float) {
             velY      = 0f
             onGround  = true
             jumpCount = 0
+            jumping   = false
             syncBounds()
         }
     }
@@ -107,84 +120,92 @@ class Player(startX: Float, startY: Float) {
         else         bounds.set(x, y, W, H)
     }
 
-    // ── Drawing ─────────────────────────────────────────────────────────────
+    // ── Draw ──────────────────────────────────────────────────────────────
 
     fun draw(sr: ShapeRenderer) {
-        if (sliding) drawSlide(sr) else drawStand(sr)
+        val alpha = if (!alive) (1f - (deathTimer * 2f).coerceAtMost(1f)) else 1f
+        if (alpha <= 0f) return
+
+        if (sliding) drawSlide(sr, alpha)
+        else         drawStand(sr, alpha)
     }
 
-    private fun drawStand(sr: ShapeRenderer) {
-        val cx    = x + W / 2f
-        val cy    = y
-        val tB    = cy + H * 0.40f   // torso bottom
-        val tT    = cy + H * 0.72f   // torso top
-        val hCy   = cy + H * 0.87f   // head centre
-        val hR    = H * 0.135f       // head radius
-        val legL  = 40f
-        val armL  = 34f
-        val la    = legAngle
-        val aa    = -la * 0.42f
+    private fun drawStand(sr: ShapeRenderer, alpha: Float) {
+        val cx   = x + W / 2f
+        val cy   = y
+        val tB   = cy + H * 0.40f
+        val tT   = cy + H * 0.72f
+        val hCy  = cy + H * 0.87f
+        val hR   = H * 0.135f
+        val legL = 36f
+        val armL = 30f
+        val la   = legAngle
+        val aa   = -la * 0.40f
 
-        // ── Legs
-        sr.color = bodyColor
-        sr.rectLine(cx, tB, cx + MathUtils.cosDeg(252f + la) * legL, tB + MathUtils.sinDeg(252f + la) * legL, 7f)
-        sr.rectLine(cx, tB, cx + MathUtils.cosDeg(288f - la) * legL, tB + MathUtils.sinDeg(288f - la) * legL, 7f)
+        val bc = Color(bodyColor.r, bodyColor.g, bodyColor.b, alpha)
+        val sc = Color(0.91f, 0.76f, 0.60f, alpha)
 
-        // ── Torso
+        // Legs
+        sr.color = bc
+        sr.rectLine(cx, tB, cx + MathUtils.cosDeg(252f + la)*legL, tB + MathUtils.sinDeg(252f + la)*legL, 7f)
+        sr.rectLine(cx, tB, cx + MathUtils.cosDeg(288f - la)*legL, tB + MathUtils.sinDeg(288f - la)*legL, 7f)
+
+        // Torso
         sr.rectLine(cx, tB, cx, tT, 8f)
 
-        // ── Arms
+        // Arms
         val aY = tT - (tT - tB) * 0.18f
-        sr.rectLine(cx, aY, cx + MathUtils.cosDeg(202f + aa) * armL, aY + MathUtils.sinDeg(202f + aa) * armL, 6f)
-        sr.rectLine(cx, aY, cx + MathUtils.cosDeg(-22f + aa) * armL, aY + MathUtils.sinDeg(-22f + aa) * armL, 6f)
+        sr.rectLine(cx, aY, cx + MathUtils.cosDeg(205f + aa)*armL, aY + MathUtils.sinDeg(205f + aa)*armL, 6f)
+        sr.rectLine(cx, aY, cx + MathUtils.cosDeg(-25f + aa)*armL, aY + MathUtils.sinDeg(-25f + aa)*armL, 6f)
 
-        // ── Head
-        sr.color = Color(0.91f, 0.76f, 0.60f, 1f)
-        sr.circle(cx, hCy, hR, 18)
+        // Head
+        sr.color = sc
+        sr.circle(cx, hCy, hR, 16)
 
-        // ── Eye
-        sr.color = bodyColor
-        sr.circle(cx + hR * 0.38f, hCy + hR * 0.08f, 3.5f, 8)
+        // Eye
+        sr.color = bc
+        sr.circle(cx + hR * 0.38f, hCy + hR * 0.08f, 3f, 8)
 
-        drawHat(sr, cx, hCy, hR)
+        drawHat(sr, cx, hCy, hR, alpha)
     }
 
-    private fun drawSlide(sr: ShapeRenderer) {
-        val cx  = x + SLIDE_W * 0.5f
-        val cy  = y + SLIDE_H * 0.5f
-        val hR  = SLIDE_H * 0.26f
+    private fun drawSlide(sr: ShapeRenderer, alpha: Float) {
+        val bc = Color(bodyColor.r, bodyColor.g, bodyColor.b, alpha)
+        val sc = Color(0.91f, 0.76f, 0.60f, alpha)
+        val hR = SLIDE_H * 0.26f
+        val cy = y + SLIDE_H * 0.52f
 
-        // Low body
-        sr.color = bodyColor
-        sr.rectLine(x + 10f, cy, x + SLIDE_W - hR * 1.4f, cy, 10f)
-
-        // Head at front
-        sr.color = Color(0.91f, 0.76f, 0.60f, 1f)
-        sr.circle(x + SLIDE_W - hR, cy + hR * 0.3f, hR, 14)
-        sr.color = bodyColor
-        sr.circle(x + SLIDE_W - hR + hR * 0.38f, cy + hR * 0.38f, 3f, 8)
+        // Body
+        sr.color = bc
+        sr.rectLine(x + 10f, cy, x + SLIDE_W - hR * 1.6f, cy, 10f)
 
         // Trailing legs
-        sr.color = bodyColor
-        sr.rectLine(x + 14f, cy, x - 10f, y + 4f, 6f)
-        sr.rectLine(x + 14f, cy, x - 6f,  y + 18f, 6f)
+        sr.rectLine(x + 14f, cy, x - 10f, y + 5f,  6f)
+        sr.rectLine(x + 14f, cy, x - 4f,  y + 20f, 6f)
+
+        // Head at front
+        sr.color = sc
+        sr.circle(x + SLIDE_W - hR, cy + hR * 0.28f, hR, 14)
+        sr.color = bc
+        sr.circle(x + SLIDE_W - hR + hR*0.38f, cy + hR*0.36f, 2.5f, 8)
     }
 
-    private fun drawHat(sr: ShapeRenderer, cx: Float, hCy: Float, r: Float) {
-        sr.color = hatColor
+    private fun drawHat(sr: ShapeRenderer, cx: Float, hCy: Float, r: Float, alpha: Float) {
+        val hc = Color(hatColor.r, hatColor.g, hatColor.b, alpha)
+        sr.color = hc
         when (hatType) {
             HatType.CAP -> {
-                sr.rect(cx - r * 0.28f, hCy + r * 0.5f,  r * 1.7f, r * 0.28f)  // brim
-                sr.rect(cx - r * 0.72f, hCy + r * 0.72f, r * 1.44f, r * 0.88f) // dome
+                sr.rect(cx - r*0.28f, hCy + r*0.50f, r*1.72f, r*0.28f)
+                sr.rect(cx - r*0.72f, hCy + r*0.72f, r*1.44f, r*0.90f)
             }
             HatType.TOP_HAT -> {
-                sr.rect(cx - r * 0.88f, hCy + r * 0.55f, r * 1.76f, r * 0.28f) // brim
-                sr.rect(cx - r * 0.52f, hCy + r * 0.76f, r * 1.04f, r * 1.4f)  // tall crown
+                sr.rect(cx - r*0.90f, hCy + r*0.54f, r*1.80f, r*0.28f)
+                sr.rect(cx - r*0.52f, hCy + r*0.76f, r*1.04f, r*1.44f)
             }
             HatType.BEANIE -> {
-                sr.circle(cx, hCy + r * 0.44f, r * 0.96f, 14)
-                sr.color = hatColor.cpy().mul(0.72f)
-                sr.rect(cx - r, hCy + r * 0.14f, r * 2f, r * 0.44f)
+                sr.circle(cx, hCy + r*0.44f, r*0.96f, 14)
+                sr.color = Color(hc.r*0.72f, hc.g*0.72f, hc.b*0.72f, alpha)
+                sr.rect(cx - r, hCy + r*0.12f, r*2f, r*0.44f)
             }
             HatType.NONE -> Unit
         }

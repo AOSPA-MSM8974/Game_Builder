@@ -12,12 +12,14 @@ class StickRunGame : Game() {
     override fun create() {
         batch = SpriteBatch()
         shape = ShapeRenderer()
+        Assets.load()
         setScreen(MenuScreen(this))
     }
 
     override fun dispose() {
         batch.dispose()
         shape.dispose()
+        Assets.dispose()
         screen?.dispose()
     }
 }
