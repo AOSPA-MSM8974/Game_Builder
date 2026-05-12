@@ -1,6 +1,10 @@
 package com.stickrun.game.world
 
-import com.stickrun.game.entities.*
+import com.stickrun.game.entities.Coin
+import com.stickrun.game.entities.Crate
+import com.stickrun.game.entities.Platform
+import com.stickrun.game.entities.Player
+import com.stickrun.game.entities.Saw
 import kotlin.random.Random
 
 class WorldGenerator {
@@ -13,12 +17,11 @@ class WorldGenerator {
         var x = startX + 600f
 
         repeat(6) {
-            val gap       = rng.nextFloat() * (maxGap - minGap) + minGap
-            val platW     = rng.nextFloat() * 160f + 160f
-            val platY     = lerp(200f, 260f, rng.nextFloat()) // elevation
-            val plat      = Platform(x, platY, platW)
+            val gap   = rng.nextFloat() * (maxGap - minGap) + minGap
+            val platW = rng.nextFloat() * 160f + 160f
+            val platY = lerp(200f, 260f, rng.nextFloat())
+            val plat  = Platform(x, platY, platW)
 
-            // Crates on the platform
             val numCrates = when {
                 difficulty > 0.6f -> rng.nextInt(1, 4)
                 difficulty > 0.3f -> rng.nextInt(1, 3)
@@ -26,13 +29,12 @@ class WorldGenerator {
             }
             if (numCrates > 0) {
                 val stack  = if (difficulty > 0.5f && rng.nextFloat() < 0.35f) 2 else 1
-                val crateX = x + rng.nextFloat() * (platW - numCrates * 64f).coerceAtLeast(0f)
+                val crateX = x + rng.nextFloat() * (platW - numCrates * Crate.SIZE).coerceAtLeast(0f)
                 for (i in 0 until numCrates) {
-                    plat.crates.add(Crate(crateX + i * 64f, plat.surfaceY, stack))
+                    plat.crates.add(Crate(crateX + i * Crate.SIZE, plat.surfaceY, stack))
                 }
             }
 
-            // Saw on platform
             if (difficulty > 0.4f && rng.nextFloat() < 0.25f && plat.crates.isEmpty()) {
                 plat.saw = Saw(x + platW / 2f, plat.surfaceY)
             }
@@ -43,7 +45,6 @@ class WorldGenerator {
         return platforms
     }
 
-    // Ground-level crates (no platform — sitting directly on ground like the original)
     fun generateGroundCrates(startX: Float, difficulty: Float): List<Crate> {
         val crates = mutableListOf<Crate>()
         val minGap = lerp(380f, 160f, difficulty)
@@ -58,25 +59,22 @@ class WorldGenerator {
                 else               -> 1
             }
             crates.add(Crate(x, Player.GROUND_Y, stack))
-            x += 64f + gap
+            x += Crate.SIZE + gap
         }
         return crates
     }
 
     fun generateCoins(platforms: List<Platform>, groundCrates: List<Crate>): List<Coin> {
         val coins = mutableListOf<Coin>()
-        // Coins above platform crates
         for (p in platforms) {
             if (p.crates.isNotEmpty()) {
-                val topCrate = p.crates.first()
-                val topY = topCrate.y + topCrate.stack * Crate.SIZE + 28f
-                for (i in 0..2) coins.add(Coin(topCrate.x + 32f + i * 36f, topY))
+                val top = p.crates.first()
+                val topY = top.y + top.stack * Crate.SIZE + 28f
+                for (i in 0..2) coins.add(Coin(top.x + 32f + i * 36f, topY))
             } else {
-                // Coins floating on empty platform
                 for (i in 0..3) coins.add(Coin(p.x + 30f + i * 44f, p.surfaceY + 36f))
             }
         }
-        // Coins above ground crates
         for (c in groundCrates) {
             val topY = c.y + c.stack * Crate.SIZE + 30f
             for (i in 0..1) coins.add(Coin(c.x + 16f + i * 36f, topY))
