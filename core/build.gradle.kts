@@ -7,6 +7,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
+kotlin {
+    jvmToolchain(8)
+}
+
 dependencies {
     implementation(libs.kotlin.stdlib)
     api(libs.gdx.core)
