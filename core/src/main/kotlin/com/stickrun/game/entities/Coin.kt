@@ -1,6 +1,8 @@
 package com.stickrun.game.entities
 
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer
 import com.badlogic.gdx.math.Rectangle
 import com.stickrun.game.Assets
 
@@ -8,15 +10,15 @@ class Coin(var cx: Float, var cy: Float) {
 
     var collected    = false
     var collectTimer = 0f
-    private var bobTimer   = 0f
-    private var frameTimer = 0f
-    private var frameIdx   = 0
+    private var bobTimer    = 0f
+    private var frameTimer  = 0f
+    private var frameIdx    = 0
 
     val bounds = Rectangle(cx - R, cy - R, R * 2f, R * 2f)
 
     companion object {
         const val R          = 28f
-        const val FRAME_TIME = 0.07f
+        const val FRAME_TIME = 0.07f   // seconds per animation frame
     }
 
     fun update(delta: Float) {
